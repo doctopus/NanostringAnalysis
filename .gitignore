@@ -11,9 +11,11 @@
 input/*
 output/*
 # Except these files in those directory
+!input/*.example
+
 !input/GSEA/
 !input/GSEA/*.gmt
 !input/*.example
 !output/*.example
 !output/figures/
-!output/figures/example.jpg
+!output/figures/README.md.png

@@ -1,25 +1,94 @@
-# Define the project name, organize folder structure. Script in project root.
-project <- "nanostring"
-# Get the Rstudio Directory
-rstudio_dir <- rstudioapi::getActiveProject()
-# Define the project directory inside Rstudio directory
-project_dir <- file.path(rstudio_dir, project)
-if (!file.exists(project_dir)) {dir.create(project_dir, recursive = TRUE)}
-# Define input and output directories
-input_dir <- file.path(project_dir, "input")
-output_dir <- file.path(project_dir, "output")
-# Check if input and output directories exist, if not, create them
-if (!file.exists(input_dir)) {dir.create(input_dir, recursive = TRUE)}
-if (!file.exists(output_dir)) {dir.create(output_dir, recursive = TRUE)}
-# Set the working directory to the project directory
-setwd(project_dir)
-#Print Confirmation of Correct Folder Structure
-if(basename(getwd()) == project) "Folder setup correctly" else "Fix folder structure"
 #===
 #Vignette using DCC and PKC Files of NanoString: https://bioconductor.org/packages/devel/workflows/vignettes/GeoMxWorkflows/inst/doc/GeomxTools_RNA-NGS_Analysis.html
 #Vignette using CountData of NanoString: https://davislaboratory.github.io/GeoMXAnalysisWorkflow/articles/GeoMXAnalysisWorkflow.html
 #===
-library(tidyverse)
+
+#### Define Functions########################
+# function to create project folder if not same as R Project folder and io folders in it 
+#...project folder could be the R project or within it with the script & io within the project
+setupProject <- function(project) {
+  rstudio_dir <- rstudioapi::getActiveProject() # Get the Rstudio Directory
+  rstudio_base <- basename(rstudio_dir) # Get the base name of the Rstudio Directory
+  if (rstudio_base != project) { # If the base name != project, create a folder named as the project inside rstudio_dir
+    project_dir <- file.path(rstudio_dir, project)
+    if (!file.exists(project_dir)) {
+      dir.create(project_dir, recursive = TRUE)
+    }
+  } else {
+    # If the base name is the same as the project, use the rstudio_dir as the project_dir
+    project_dir <- rstudio_dir
+  }
+  # Define input and output directories inside the project directory
+  input_dir <- file.path(project_dir, "input")
+  output_dir <- file.path(project_dir, "output")
+  # Check if input and output directories exist, if not, create them
+  if (!file.exists(input_dir)) {
+    dir.create(input_dir, recursive = TRUE)
+  }
+  if (!file.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+  # Set the working directory to the project directory
+  setwd(project_dir)
+  # Print Confirmation of Correct Folder Structure
+  if (basename(getwd()) == project) {
+    print("Folder setup correctly")
+  } else {
+    print("Fix folder structure")
+  }
+  # Export input_dir and output_dir to the global environment
+  assign("input_dir", input_dir, envir = .GlobalEnv)
+  assign("output_dir", output_dir, envir = .GlobalEnv)
+}
+savePDF <- function(figure, fileName, w = 7, h = 10) {
+  currentDate <- format(Sys.Date(), "%Y%m%d") #current date in YYYYMMDD format
+  # Define the directory for saving figures
+  figuresDir <- file.path(output_dir, "figures")
+  if (!dir.exists(figuresDir)) { dir.create(figuresDir, recursive = TRUE) }
+  fullFilePath <- file.path(figuresDir, paste0(currentDate, "_", fileName, ".pdf"))
+  # Save the figure
+  pdf(file = fullFilePath, width = w, height = h, pointsize = 300 / 72)
+  print(figure)
+  dev.off()
+}
+savePNG <- function(figure, fileName, w = 900, h = 1300) {
+  currentDate <- format(Sys.Date(), "%Y%m%d") # current date in YYYYMMDD format
+  # Define the directory for saving figures
+  figuresDir <- file.path(output_dir, "figures")
+  if (!dir.exists(figuresDir)) { dir.create(figuresDir, recursive = TRUE) }
+  fullFilePath <- file.path(figuresDir, paste0(currentDate, "_", fileName, ".png"))
+  # Save the figure as PNG with dimensions in pixels
+  png(file = fullFilePath, width = w, height = h, units = "px")
+  # Render the plot
+  print(figure)
+  dev.off()
+}
+
+#### Analysis Specific Code ----
+#Initiate project
+setupProject("NanostringAnalysis")
+getwd()
+# Project specific override: output folder if any
+#output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/RNASeqAnalysis/output/1.0_QualityControl"
+
+#### Install & Load Packages ----
+list.of.packages.cran <- c("DT", "ggalluvial", "ggrepel", "igraph", "tidyverse")
+new.packages.cran <- list.of.packages.cran[!(list.of.packages.cran %in% installed.packages()[,"Package"])]
+if(length(new.packages.cran)>0) install.packages(new.packages.cran)
+# Install not-yet-installed Bioconductor packages
+list.of.packages.bioc <- c("edgeR", "GSEABase", "limma", "msigdb", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
+new.packages.bioc <- list.of.packages.bioc[!(list.of.packages.bioc %in% installed.packages()[,"Package"])]
+if(length(new.packages.bioc)>0)if (!requireNamespace("BiocManager")) install.packages("BiocManager")
+BiocManager::install(new.packages.bioc, update = FALSE)
+# Load packages
+sapply(c(list.of.packages.cran, list.of.packages.bioc), require, character.only=TRUE)
+
+#rm(list=ls()) #remove all existing lists; DONT
+
+#### Source & Process Input files ----
+# sampleAnnoFile from SegmentProperties sheet
+# countFile & featureAnnoFile from BioProbeCountMatrix sheet
+
 #sampleAnnoFile ----
 #SegmentProperties Worksheet: SegmentDisplayName is default column
 sampleAnnoFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
@@ -35,40 +104,62 @@ final_sampleAnnoFile <- sampleAnnoFile %>%
   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
 # write.table(sampleAnnoFile, "output/sampleAnnoFile.txt", sep = "\t", row.names = FALSE, col.names = TRUE)
-
 # duplicates <- c('D830030K20Rik', 'Gm10406', 'LOC118568634')
 
-
-
 #featureAnnoFile----
-#BioProbeCountMmatrix Worksheet: TargetName is default column
+#BioProbeCountMatrix Worksheet: TargetName is default column
 featureAnnoFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
-                                      sheet = "BioProbeCountMatrix") %>% 
-  select(., 1:12) %>% 
-  select(TargetName, everything())
-# Process rows with "NegProbe-WTX"
-negprobe_wtx <- featureAnnoFile %>%
+                                      sheet = "BioProbeCountMatrix")
+
+featureAnnoFile <- dplyr::select(featureAnnoFile, 1:12) %>% 
+  dplyr::select(TargetName, everything())
+
+# Isolate rows with "NegProbe-WTX" in TargetName
+featureAnnoFile_NegProbeWTX <- featureAnnoFile %>%
   filter(TargetName == "NegProbe-WTX")
 
 # Process other rows to remove duplicates based on "TargetName" and concatenate unique values for duplicates
-other_rows <- featureAnnoFile %>%
-  filter(TargetName != "NegProbe-WTX") %>%
-  mutate_at(c("GeneID"), as.character) %>% 
-  group_by(TargetName) %>%
+  # featureAnnoFile_others <- featureAnnoFile %>%
+  #   filter(TargetName != "NegProbe-WTX") %>% #Remaining rows with genes in TargetName
+  #   mutate_at(c("GeneID"), as.character) %>% #Convert GeneID num -> character
+  #   dplyr::group_by(TargetName) %>% #Concatenate unique values of duplicate TargetNames
+  #   summarise(across(
+  #     .cols = everything(),
+  #     .fns = ~ if (n() > 1) {
+  #       unique_values <- unique(trimws(unlist(strsplit(as.character(.), ","))))
+  #       paste(unique_values, collapse = ",")
+  #     } else {
+  #       first(.)
+  #     }
+  #   ), .groups = "drop") %>%
+  #   mutate(GeneID = first(featureAnnoFile$GeneID[match(TargetName, featureAnnoFile$TargetName)]))
+
+#Improved way addresses issues in above code.
+#.fns = ~ if (n() > 1) { ... } else { .[1] } to handle cases where there are duplicates or not, 
+#ensuring .fns works with character vectors properly.
+#Added rowwise() before the mutate step to ensure that mutate works row-wise
+#Used indexing [1] instead of first to avoid issues with the first method for numeric vectors.
+featureAnnoFile_others <- featureAnnoFile %>%
+  filter(TargetName != "NegProbe-WTX") %>% # Remaining rows with genes in TargetName
+  mutate(GeneID = as.character(GeneID)) %>% # Convert GeneID num -> character
+  group_by(TargetName) %>% # Concatenate unique values of duplicate TargetNames
   summarise(across(
     .cols = everything(),
     .fns = ~ if (n() > 1) {
       unique_values <- unique(trimws(unlist(strsplit(as.character(.), ","))))
       paste(unique_values, collapse = ",")
     } else {
-      first(.)
+      .[1]
     }
   ), .groups = "drop") %>%
-  mutate(GeneID = first(featureAnnoFile$GeneID[match(TargetName, featureAnnoFile$TargetName)]))
+  rowwise() %>%
+  mutate(GeneID = featureAnnoFile$GeneID[match(TargetName, featureAnnoFile$TargetName)][1])
+
+
 
 
 # Combine both processed datasets
-final_featureAnnoFile <- bind_rows(negprobe_wtx, other_rows) %>% 
+final_featureAnnoFile <- bind_rows(featureAnnoFile_NegProbeWTX, featureAnnoFile_others) %>% 
   as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
 
 #
@@ -114,8 +205,8 @@ final_featureAnnoFile <- bind_rows(negprobe_wtx, other_rows) %>%
 
 #CountFile----
 countFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
-                        sheet="BioProbeCountMatrix") %>% 
-  select(., c(3, 13:187)) %>% 
+                        sheet="BioProbeCountMatrix") 
+countFile <- countFile %>%   dplyr::select(., c(3, 13:187)) %>% 
   # filter(TargetName !=duplicates) %>%
   setNames(c(gsub(" 1/2-", "", colnames(.)))) %>% 
   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
@@ -180,8 +271,8 @@ library(standR)
 # Create spatialExperiement object
 
 seo <- readGeoMx(countFile = final_countFile,
-                    sampleAnnoFile = final_sampleAnnoFile,
-                    featureAnnoFile = final_featureAnnoFile)
+                  sampleAnnoFile = final_sampleAnnoFile,
+                  featureAnnoFile = final_featureAnnoFile)
 
 # seo_df <- readGeoMx(countFile = "output/countFile.txt",
                  # sampleAnnoFile = "output/sampleAnnoFile.txt",
@@ -192,8 +283,11 @@ seo <- readGeoMx(countFile = final_countFile,
 
 library(SpatialExperiment)
 seo
+
+#Examine the data
 assays(seo)
 seo$ROILabel
+
 assayNames(seo)
 
 #View the count table using the assay function
@@ -206,33 +300,45 @@ rowData(seo)[1:5,1:5]
 #WTA has NegProbe-WTX data. Ensure that there are no duplicate gene names in the TargetName column
 metadata(seo)$NegProbes[,1:5]
 colData(seo)$QCFlags
+colData(seo)$tissue
+names(seo@colData)
 
 #QC Steps 
 #Sample level QC
 library(ggplot2)
 library(ggalluvial)
-plotSampleInfo(seo, column2plot =c("SlideName", "tissue"))#, "CD45", "Neuron"))
-# colData(seo)$tissue
-
+plotSampleInfo(seo, column2plot =c("tissue", "SlideName", "CD45", "Neuron"))
 
 #Gene level QC
 seo #Dim 19962x175
 seo_qc <- addPerROIQC(seo, 
-                      sample_fraction = 0.9, #Default
                       rm_genes =TRUE,
+                      sample_fraction = 0.9, #Default
                       min_count = 5) #Default
 seo_qc #Gene with low count in more than threshold (sample_fraction=0.9)
 # are removed by applying the function. Dim 19948x175, so removed 14 genes
-dim(seo) #The dimensions remains same even if the row name goes down from 19962 > 19948 
-metadata(seo_qc) |> names()
+dim(seo) 
+dim(seo_qc) #Genes not meeting the above criteria were removed 19962 > 19948 
+names(seo_qc@colData)
+
+names(seo_qc@metadata)
+metadata(seo_qc) |> names() #Same as above
 metadata(seo) |>names()
-# plotGeneQC(seo, ordannots = "regions", col = regions, point_size = 2)
+
+#addPerROIQC added columns to colData :lib_size, countOfLowEprGene, percentOfLowEprGene
+# and also added columns to metadata: lcpm_threshold, genes_rm_rawCount, genes_rm_logCPM  
+
+
+# plotGeneQC(seo_qc, ordannots = "regions", col = regions, point_size = 2)
+plotGeneQC(seo_qc)
 plotGeneQC(seo_qc, ordannots = "tissue", col = tissue, point_size = 2)
+
 #colData(seo)$regions
 #colnames(seo) %>% print() 
-data("seo_qc")
-seo_subset <-  addPerROIQC(seo_qc)
-plotGeneQC(seo_subset)
+
+# data("seo_qc")
+# seo_subset <-  addPerROIQC(seo_qc) #Wrong; already done this step to get seo_qc
+# plotGeneQC(seo_subset)
 
 
 #ROI level QC
