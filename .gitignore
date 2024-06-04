@@ -1,0 +1,19 @@
+.DS_Store
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+# Log Files
+*.log
+# Figures 
+*.png
+# Ignore all files in io directory
+input/*
+output/*
+# Except these files in those directory
+!input/GSEA/
+!input/GSEA/*.gmt
+!input/*.example
+!output/*.example
+!output/figures/
+!output/figures/example.jpg
