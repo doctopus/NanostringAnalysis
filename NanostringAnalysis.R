@@ -349,7 +349,7 @@ qc <- colData(seo_qc)$AOINucleiCount > 150
 table(qc) # 3 Values Below threshold
 seo_qc # Dim 19948x175
 seo_qc_roi <- seo_qc[, qc]
-seo_qc_roi # We removed 3 ROI froom dataset. Dim 19948x172
+seo_qc_roi # We removed 3 ROI (samples/columns)from dataset. Dim 19948x172
 # Comparing the Library Size with ROI Area size
 plotROIQC(seo_qc_roi, 
           x_threshold = 20000, 
