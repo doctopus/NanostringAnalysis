@@ -1,6 +1,7 @@
 #===
 #Vignette using DCC and PKC Files of NanoString: https://bioconductor.org/packages/devel/workflows/vignettes/GeoMxWorkflows/inst/doc/GeomxTools_RNA-NGS_Analysis.html
 #Vignette using CountData of NanoString: https://davislaboratory.github.io/GeoMXAnalysisWorkflow/articles/GeoMXAnalysisWorkflow.html
+#Vignette partial upto data preparation: https://davislaboratory.github.io/standR/articles/standR_introduction.html
 #===
 
 #### Define Functions########################
@@ -154,8 +155,6 @@ featureAnnoFile_others <- featureAnnoFile %>%
   ), .groups = "drop") %>%
   rowwise() %>%
   mutate(GeneID = featureAnnoFile$GeneID[match(TargetName, featureAnnoFile$TargetName)][1])
-
-
 
 
 # Combine both processed datasets
@@ -464,6 +463,10 @@ print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = tissue,
 colData(spe_ruv)[,seq(ncol(colData(spe_ruv))-1, ncol(colData(spe_ruv)))] |>head()
 #↑This will have as many W columns as defined in the geomBatchCorrection step
 
+#spe_ruv@colData
+temp <-  spe_ruv@colData
+spe_ruv@colData$temp
+
 #Establishing design matrix and contrast
 #Derive DGElist object from SpatialExperiment Object using SE2DGEList function of edgeR
 
@@ -478,6 +481,17 @@ colnames(design)
 #Rename by removing the tissue prefix
 colnames(design) <- gsub("^tissue", "", colnames(design))
 
+#Create alternative Design file for DESeq2
+design_mods <- as.data.frame(design) %>%
+  rownames_to_column("RowName") %>%        #Convert row names to a column
+  mutate(Sample = gsub(" \\|.*", "", RowName)) %>%  #Extract the part before the first pipe
+  pivot_longer(cols = tumor:tumor_gland, names_to = "Tissue", values_to = "Value") %>%
+  filter(Value == 1) %>%
+  select(-Value) %>%
+  arrange(RowName) %>%
+  column_to_rownames("RowName") #Convert back to row names
+
+
 #To compare Tumor with Tumor Edge
 contr.matrix <- makeContrasts(
   TvE = tumor - tumor_edge,
@@ -489,11 +503,12 @@ table(keep) #Shows no gene is excluded, all 19948 genes kept
 rownames(dge)[!keep] #remove any gene with low expression; here nothing will be removed
 dge_all <- dge[keep, ]
 
-#Biological CV (BCV) is the coeeficient of variation with with the (unknown) true abundace
-#...of the gene varies vetween rerplicate RNA samples.
+#Biological CV (BCV) is the coeficient of variation with with the (unknown) true abundance
+#...of the gene varies between replicate RNA samples.
 #BCV Check
 dge_all <- estimateDisp(dge_all, design = design, robust = TRUE)
 names(dge_all)
+
 
 plotBCV(dge_all, legend.position = "topleft", ylim = c(0, 1.3))
 
@@ -544,6 +559,84 @@ de_results_TvE %>%
   theme(text = element_text(size=15),
         plot.title = element_text(hjust = 0.5))
 
+#Second set of comparison
+
+contr.matrix2 <- makeContrasts(
+  TvEG = tumor - tumor_edge_with_gland,
+  levels = colnames(design))
+
+fit_contrast2 <- contrasts.fit(fit, contrasts = contr.matrix2)
+efit2 <- eBayes(fit_contrast2, robust = TRUE)
+
+results_efit2 <- decideTests(efit2, p.value = 0.5)
+summary_efit2 <- summary(results_efit2)
+summary_efit2 #Shows that between the TvEG contrast group, how many genes are up and down regulated
+
+#Visualization
+# library(ggrepel)
+# library(tidyverse)
+de_results_TvEG <- topTable(efit2, coef = 1, sort.by = "P", n = Inf)
+
+de_genes_toptable_TvEG <- topTable(efit2, coef = 1, sort.by = "P", n = Inf, p.value = 0.05)
+
+de_results_TvEG %>% 
+  mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
+                     ifelse(logFC<0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
+  ggplot(aes(AveExpr, logFC, col = DE)) +
+  geom_point(shape = 1, size = 1) +
+  geom_text_repel(data = de_genes_toptable_TvEG %>% 
+                    mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
+                                       ifelse(logFC < 0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
+                    rownames_to_column(), aes(label = rowname)) +
+  theme_bw() +
+  xlab("Average log-expression") +
+  ylab("Log-fold-change") +
+  ggtitle("Tumor vs Tumor_Edge_With_Gland") +
+  scale_color_manual(values = c("blue", "grey", "red")) +
+  theme(text = element_text(size=15),
+        plot.title = element_text(hjust = 0.5))
+
+
+
+
+#Third set of comparison
+
+contr.matrix3 <- makeContrasts(
+  TvG = tumor - tumor_gland,
+  levels = colnames(design))
+
+fit_contrast3 <- contrasts.fit(fit, contrasts = contr.matrix3)
+efit3 <- eBayes(fit_contrast3, robust = TRUE)
+
+results_efit3 <- decideTests(efit3, p.value = 0.5)
+summary_efit3 <- summary(results_efit3)
+summary_efit3 #Shows that between the TvEG contrast group, how many genes are up and down regulated
+
+#Visualization
+# library(ggrepel)
+# library(tidyverse)
+de_results_TvG <- topTable(efit3, coef = 1, sort.by = "P", n = Inf)
+
+de_genes_toptable_TvG <- topTable(efit3, coef = 1, sort.by = "P", n = Inf, p.value = 0.05)
+
+de_results_TvG %>% 
+  mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
+                     ifelse(logFC<0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
+  ggplot(aes(AveExpr, logFC, col = DE)) +
+  geom_point(shape = 1, size = 1) +
+  geom_text_repel(data = de_genes_toptable_TvG %>% 
+                    mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
+                                       ifelse(logFC < 0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
+                    rownames_to_column(), aes(label = rowname)) +
+  theme_bw() +
+  xlab("Average log-expression") +
+  ylab("Log-fold-change") +
+  ggtitle("Tumor vs Tumor_Gland") +
+  scale_color_manual(values = c("blue", "grey", "red")) +
+  theme(text = element_text(size=15),
+        plot.title = element_text(hjust = 0.5))
+
+
 #Gene Set Enrichment Analysis
 #Using fry from limma package
 #Load Gene sets
@@ -551,3 +644,66 @@ library(msigdb)
 library(GSEABase)
 msigdb_hs <- getMsigdb(version ='7.2')
 
+msigdb_hs <- appendKEGG(msigdb_hs)
+
+sc <- listSubCollections(msigdb_hs)
+gsc <- c(subsetCollection(msigdb_hs, c('h')),
+         subsetCollection(msigdb_hs, 'c2', sc[grepl("^CP:", sc)]),
+         subsetCollection(msigdb_hs, 'c5', sc[grepl("^GO:", sc)])) %>%
+  GeneSetCollection()
+
+#Enrichment Analysis
+fry_indices <- ids2indices(lapply(gsc, geneIds), rownames(v), remove.empty = FALSE)
+names(fry_indices) <- sapply(gsc, setName)
+
+gsc_category <- sapply(gsc, function(x) bcCategory(collectionType(x)))
+gsc_category <- gsc_category[sapply(fry_indices, length) > 5] #Filter out genesets with <5 genes
+
+gsc_subcategory <- sapply(gsc, function(x) bcSubCategory(collectionType(x)))
+gsc_subcategory <- gsc_subcategory[sapply(fry_indices, length) > 5]
+
+fry_indices <- fry_indices[sapply(fry_indices, length) > 5]
+names(gsc_category) = names(gsc_subcategory) = names(fry_indices)
+
+#Run fry with all the gene sets filtered above
+fry_indices_cat <- split(fry_indices, gsc_category[names(fry_indices)])
+fry_res_out <- lapply(fry_indices_cat, function (x) {
+  limma::fry(v, index = x, design = design, contrast = contr.matrix[,1], robust = TRUE)
+})
+
+post_fry_format <- function(fry_output, gsc_category, gsc_subcategory){
+  names(fry_output) <- NULL
+  fry_output <- do.call(rbind, fry_output)
+  fry_output$GenesetName <- rownames(fry_output)
+  fry_output$GenesetCat <- gsc_category[rownames(fry_output)]
+  fry_output$GenesetSubCat <- gsc_subcategory[rownames(fry_output)]
+  return(fry_output)
+}
+
+fry_res_sig <- post_fry_format(fry_res_out, gsc_category, gsc_subcategory) %>%
+  as.data.frame() %>%
+  filter(FDR < 0.05) 
+
+#The output data.frame can be inspected for top N genes
+fry_res_sig %>%
+  arrange(FDR) %>%
+  filter(Direction == "Up") %>%
+  .[seq(20),] %>%
+  mutate(GenesetName = factor(GenesetName, levels = .$GenesetName)) %>%
+  ggplot(aes(GenesetName, -log(FDR))) +
+  geom_bar(stat = "identity", fill = "red") +
+  theme_bw() +
+  coord_flip() +
+  ggtitle("Up-regulated")
+
+#Plotting the top n downregulated genes
+fry_res_sig %>%
+  arrange(FDR) %>%
+  filter(Direction == "Down") %>%
+  .[seq(20),] %>%
+  mutate(GenesetName = factor(GenesetName, levels = .$GenesetName)) %>%
+  ggplot(aes(GenesetName, -log(FDR))) +
+  geom_bar(stat = "identity", fill = "blue") +
+  theme_bw() +
+  coord_flip() +
+  ggtitle("Down-regulated")
