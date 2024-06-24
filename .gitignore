@@ -3,6 +3,8 @@
 .Rhistory
 .RData
 .Ruserdata
+#Dataspell configurations
+.idea/
 # Log Files
 *.log
 # Figures 

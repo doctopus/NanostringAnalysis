@@ -4,10 +4,10 @@
 #Vignette partial upto data preparation: https://davislaboratory.github.io/standR/articles/standR_introduction.html
 #===
 
-#### Define Functions########################
-# function to create project folder if not same as R Project folder and io folders in it 
-#...project folder could be the R project or within it with the script & io within the project
+##### Define Functions########################
 setupProject <- function(project) {
+  #Create 'project' dir if not same as name of *.Rproj dir as root/proj/io, else
+  #..set root as proj dir, create io as root/io; set input_dir & output_dir vars
   rstudio_dir <- rstudioapi::getActiveProject() # Get the Rstudio Directory
   rstudio_base <- basename(rstudio_dir) # Get the base name of the Rstudio Directory
   if (rstudio_base != project) { # If the base name != project, create a folder named as the project inside rstudio_dir
@@ -64,39 +64,41 @@ savePNG <- function(figure, fileName, w = 900, h = 1300) {
   print(figure)
   dev.off()
 }
+install_and_load_packages <- function(cran_packages, bioc_packages) {
+  # Install missing CRAN packages
+  new_packages_cran <- cran_packages[!(cran_packages %in% installed.packages()[, "Package"])]
+  if (length(new_packages_cran) > 0) {install.packages(new_packages_cran)}
+  # Install missing Bioconductor packages
+  new_packages_bioc <- bioc_packages[!(bioc_packages %in% installed.packages()[, "Package"])]
+  if (length(new_packages_bioc) > 0) {
+    if (!requireNamespace("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
+    BiocManager::install(new_packages_bioc, update = FALSE)
+  }
+  # Load all packages
+  all_packages <- c(cran_packages, bioc_packages)
+  sapply(all_packages, require, character.only = TRUE)
+}
+##### Setup Project ----
+## Initiate project
+setupProject("NanostringAnalysis") ; print(paste0("Working dir is: ", getwd()))
+# If any project specific override: output folder if any
+# output_dir <- paste0(output_dir, "/1.1_Nanostring")
 
-#### Analysis Specific Code ----
-#Initiate project
-setupProject("NanostringAnalysis")
-getwd()
-# Project specific override: output folder if any
-#output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/RNASeqAnalysis/output/1.0_QualityControl"
-
-#### Install & Load Packages ----
-list.of.packages.cran <- c("DT", "ggalluvial", "ggrepel", "igraph", "tidyverse")
-new.packages.cran <- list.of.packages.cran[!(list.of.packages.cran %in% installed.packages()[,"Package"])]
-if(length(new.packages.cran)>0) install.packages(new.packages.cran)
-# Install not-yet-installed Bioconductor packages
-list.of.packages.bioc <- c("edgeR", "GSEABase", "limma", "msigdb", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
-new.packages.bioc <- list.of.packages.bioc[!(list.of.packages.bioc %in% installed.packages()[,"Package"])]
-if(length(new.packages.bioc)>0)if (!requireNamespace("BiocManager")) install.packages("BiocManager")
-BiocManager::install(new.packages.bioc, update = FALSE)
-# Load packages
-sapply(c(list.of.packages.cran, list.of.packages.bioc), require, character.only=TRUE)
-
-#rm(list=ls()) #remove all existing lists; DONT
+## Install & Load Packages
+cran_packages <- c("DT", "ggalluvial", "ggrepel", "igraph", "magick", "tidyverse")
+bioc_packages <- c("edgeR", "GSEABase", "limma", "msigdb", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
+install_and_load_packages(cran_packages, bioc_packages)
 
 #### Source & Process Input files ----
 # sampleAnnoFile from SegmentProperties sheet
 # countFile & featureAnnoFile from BioProbeCountMatrix sheet
-
-#sampleAnnoFile ----
+#sampleAnnoFile----
 #SegmentProperties Worksheet: SegmentDisplayName is default column
 sampleAnnoFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
                                      sheet="SegmentProperties")
 
 final_sampleAnnoFile <- sampleAnnoFile %>% 
-  mutate(SlideName = gsub(" breast", "", 
+  mutate(SlideName = gsub(" breast", "", #Format texts; remove extra words and signs
                           gsub(" 1/2-", "", SlideName)),
          ScanLabel = gsub(" 1/2-", "", ScanLabel),
          SegmentDisplayName = gsub(" 1/2-", "", SegmentDisplayName),
@@ -112,9 +114,10 @@ final_sampleAnnoFile <- sampleAnnoFile %>%
 featureAnnoFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
                                       sheet = "BioProbeCountMatrix")
 
-featureAnnoFile <- dplyr::select(featureAnnoFile, 1:12) %>% 
+featureAnnoFile <- dplyr::select(featureAnnoFile, 1:12) %>% #Get the featureData relevant columns only
   dplyr::select(TargetName, everything())
 
+#Process the duplicates where the Targetname is not NegProbe-WTX and then combine them back
 # Isolate rows with "NegProbe-WTX" in TargetName
 featureAnnoFile_NegProbeWTX <- featureAnnoFile %>%
   filter(TargetName == "NegProbe-WTX")
@@ -180,7 +183,7 @@ final_featureAnnoFile <- bind_rows(featureAnnoFile_NegProbeWTX, featureAnnoFile_
 #   }), .groups = "drop") %>% 
 #   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
-#====
+#==
 # duplicated_values <- unique(featureAnnoFile$TargetName[duplicated(featureAnnoFile$TargetName)])
 
 # column_names <- colnames(featureAnnoFile)
@@ -202,14 +205,15 @@ final_featureAnnoFile <- bind_rows(featureAnnoFile_NegProbeWTX, featureAnnoFile_
 # 
 # is.data.frame(featureAnnoFile)
 
-#CountFile----
+#countFile----
 countFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
                         sheet="BioProbeCountMatrix") 
-countFile <- countFile %>%   dplyr::select(., c(3, 13:187)) %>% 
+countFile <- countFile %>%   dplyr::select(., c(3, 13:187)) %>% #Select the rest of sheet after the featureAnnoFile
   # filter(TargetName !=duplicates) %>%
   setNames(c(gsub(" 1/2-", "", colnames(.)))) %>% 
   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
+#Process the duplicates where the Targetname is not NegProbe-WTX and then combine them back
 #countFile_NegProbeWTX <- countFile[which(countFile[,"TargetName"]=="NegProbe-WTX"),]
 countFile_NegProbeWTX <- countFile %>% filter(TargetName == "NegProbe-WTX")
 
@@ -222,7 +226,7 @@ countFile_others <- countFile %>%
 final_countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>% 
   as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
 
-#----
+#Old Code Skip----
 #colnames(countFile) %>% print() #All column names
 #colnames(countFile) = gsub(" 1/2-", "", colnames(countFile))
 #Also known as CountFile: TargetName is default column
@@ -263,11 +267,11 @@ final_countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>%
 # colnames(featureAnnoFile) %>% print()
 # rownames(featureAnnoFile) %>% print()
 
+####### Create Spatial Experiment Object----
 # BiocManager::install("standR")
-library(standR)
+# library(standR)
 #install.packages("ggalluvial") #required for the standR package
 #install.packages("magick") #required for the standR package
-# Create spatialExperiement object
 
 seo <- readGeoMx(countFile = final_countFile,
                   sampleAnnoFile = final_sampleAnnoFile,
@@ -280,11 +284,12 @@ seo <- readGeoMx(countFile = final_countFile,
                  # rmNegProbe = TRUE,
                  # NegProbeName = "NegProbe-WTX")
 
-library(SpatialExperiment)
+# library(SpatialExperiment)
 seo
 
 #Examine the data
 assays(seo)
+seo@
 seo$ROILabel
 seo$AOINucleiCount
 names(seo@metadata)
