@@ -267,7 +267,7 @@ final_countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>%
 # colnames(featureAnnoFile) %>% print()
 # rownames(featureAnnoFile) %>% print()
 
-####### Create Spatial Experiment Object----
+####### CREATE SPATIAL EXPERIMENT OBJECT----
 # BiocManager::install("standR")
 # library(standR)
 #install.packages("ggalluvial") #required for the standR package
@@ -289,7 +289,8 @@ seo
 
 #Examine the data
 assays(seo)
-seo@
+seo@int_metadata$spatialDataNames
+seo$
 seo$ROILabel
 seo$AOINucleiCount
 names(seo@metadata)
@@ -310,14 +311,16 @@ colData(seo)$QCFlags
 colData(seo)$tissue
 names(seo@colData)
 
-#QC Steps 
+####### QC Steps ---- 
 #Sample level QC
 library(ggplot2)
 library(ggalluvial)
+#Visualize the data
 plotSampleInfo(seo, column2plot =c("tissue", "SlideName", "CD45", "Neuron"))
 
-#Gene level QC
+#### Gene level QC----
 seo #Dim 19962x175
+names(colData(seo)) #46 Columns in ColData
 seo_qc <- addPerROIQC(seo, 
                       rm_genes =TRUE,
                       sample_fraction = 0.9, #Default
@@ -327,7 +330,8 @@ seo_qc #Gene with low count and expression values in more than threshold (sample
 dim(seo) 
 dim(seo_qc) #Genes not meeting the above criteria were removed 19962 > 19948 
 names(seo_qc@colData)
-length(seo_qc@metadata$genes_rm_rawCount)
+length(seo@metadata$genes_rm_rawCount) #0
+length(seo_qc@metadata$genes_rm_rawCount) #175
 names(seo_qc@metadata)
 metadata(seo_qc) |> names() #Same as above
 metadata(seo) |>names()
@@ -348,7 +352,7 @@ plotGeneQC(seo_qc, top_n=12, ordannots = "tissue", col = tissue, point_size = 2)
 # plotGeneQC(seo_subset)
 
 
-#ROI level QC
+#### ROI level QC ----
 plotROIQC(seo_qc, x_threshold = 150, color = SlideName)
 
 colData(seo_qc)$AOINucleiCount 
@@ -371,7 +375,11 @@ plotROIQC(seo_qc_roi,
           y_lab = "Library Size", 
           col = SlideName)
 
-plotROIQC(seo_qc_roi, x_threshold = 150, y_threshold = 1e+01, color = SlideName)
+plotROIQC(seo_qc_roi, 
+          x_threshold = 150, 
+          x_axis = "AOINucleiCount", #Default
+          y_threshold = 1e+01, 
+          color = SlideName)
 
 # Relative log expression distribution
 plotRLExpr(seo) #RLE of raw count 
@@ -381,7 +389,7 @@ plotRLExpr(seo_qc_roi, ordannots = "SlideName", assay = 2, color = SlideName)
 #can also plot by tissue type or other classification
 plotRLExpr(seo_qc_roi, ordannots = "tissue", assay = 2, color = tissue)
 
-#Dimentionality Reduction
+#### Dimentionality Reduction ----
 #seo_qc_roi@assays #Assay 2 is based on logcounts
 # BiocManager::install("scater")
 drawPCA(seo_qc_roi, assay = 2, color = tissue) # however since the pca will change axis every time we plot, 
@@ -389,7 +397,9 @@ drawPCA(seo_qc_roi, assay = 2, color = tissue) # however since the pca will chan
 drawPCA(seo_qc_roi, assay =2, color = SlideName)
 #To make it reproducible
 set.seed(100)
+
 seoPCA <-  scater::runPCA(seo_qc_roi)
+#runPCA adds reducedDimNames PCA
 pca_results <-  reducedDim(seoPCA, "PCA")
 drawPCA(seoPCA, precomputed = pca_results, col = tissue)
 drawPCA(seoPCA, precomputed = pca_results, col = SlideName)
@@ -407,54 +417,95 @@ standR::plotMDS(seo_qc_roi, assay = 2, color = tissue)
 
 #UMAP
 set.seed(100)
+
 seoUMAP <- scater::runUMAP(seoPCA, dimred = "PCA")
+#runUMAP adds one more reducedDimNames UMAP
 plotDR(seoUMAP, dimred = "UMAP", col = tissue)
 plotDR(seoUMAP, dimred = "UMAP", col = SlideName)
 
-## Normalization########
-#Using the data as seoPCA or seoUMAP produces the same plot, so the data remains same
-#As per the vignette, the later is used in the normalization process below.
 
+
+#### Normalization########----
+#Data has become seoUMAP now with addition of two reducedDimNames PCA and UMAP
 #names(seoUMAP@metadata)
 seo_tmm <- geomxNorm(seoUMAP, method = "TMM") #TMM Normalization
-plotRLExpr(seo_tmm, assay = 2, color = tissue) + ggtitle("TMM")
-#geomxNorm below, adds two more parameter to the metadata: "norm.factor" "norm.method".
+#geomxNorm Adds two more items to metadata: norm.factor, norm.method
+
 #names(seo_tmm@metadata)
+plotRLExpr(seo_tmm, assay = 2, color = tissue) + ggtitle("TMM")
+
 plotRLExpr(seo_tmm, assay = 2, color = SlideName) + ggtitle("TMM")
 
-#Do PCA plot of the geomxNorm'ed data
+
+#Do PCA plot of the geomxNorm'ed data (to see only, not intended to add data to object)
 spe_tmm <- scater::runPCA(seo_tmm)
 pca_results_tmm <- reducedDim(spe_tmm, "PCA")
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = SlideName)
 plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = tissue)
 
-##Batch Correction#########
-#Find the least variable 300 genes across the slides
-# Dataset used is **from before Normalization** (seoUMAP /seoPCA)
-spe_batch <- findNCGs(seoUMAP, batch_name = "SlideName", top_n = 300)
-names(spe_batch@metadata) #Adds NCGs (Negative Control Genes to metadata)
+#### Batch Correction#########----
+# Dataset used is **from before Normalization** (seoUMAP that has two reduced DimNames added)
+# One way to remove batch effect is to identify negative control genes (NCGs) among the slides
+# Find the least variable 300 genes across the slides; using findNCGs function
+spe_batch <- findNCGs(seoUMAP, 
+                      n_assay = 1, #Of two assays in seoUMAP@assays, defining 1st(counts) or 2nd (logcounts) to use
+                      batch_name = "SlideName", #Where batch effect expected to be observed
+                      top_n = 300)
+##findNCGs adds 'NCGs' (Negative Control Genes to metadata)
+names(spe_batch@metadata) 
+names(spe_batch@assays)
+seoUMAP@colData$Neuron
+seoUMAP@colData$SlideName
+seoUMAP@colData$tissue
 
-#Use RUV4 (remove unwanted variation 4) which requires NCG data to normalize using geomxBatchCorrection
+# Use RUV4 (remove unwanted variation 4) which requires NCG data to normalize using geomxBatchCorrection
 # RUV4 requires : factors of interest, NCGs, Number of unwanted factors to use; smallest number where technical variations no longer exist
 # Test out K values until desired level of removal of technical variation
 # Optimal K value is that produces a separation of main biology of interest on the PCA plot
 # Run Paired PCA plot for k values between 1 to 5
 
-spe_ruv <- geomxBatchCorrection(spe_batch, factors = "tissue", 
-                                NCGs = metadata(spe_batch)$NCGs, k =5)
-print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = tissue,
-                  title = paste0("k = 5 : tissue")))
+####Determine parameter to batch correct
+#To plot all pairPCAs together
+for(i in seq(5)){
+  spe_ruv <- geomxBatchCorrection(spe_batch, factors = "tissue", 
+                                  NCGs = metadata(spe_batch)$NCGs, k = i)
+  
+  print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = Type, title = paste0("k = ", i)))
+  
+}
 
-#Using Tissue as factor in geomBatchCorrection
-#Batch Correction 2
-#Since Slidename is our biology of interest, batch factor inducing variable could be tissue
+#Else, print each one separately by changing k each time
+spe_ruv <- geomxBatchCorrection(spe_batch, factors = "tissue", #factors of interest
+                                NCGs = metadata(spe_batch)$NCGs, k =5)
+## geomxBatchCorrection adds colData 5 data points: ruv_W1 to ruv_W5
+
+print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = tissue,
+                  title = paste0("k = 5 : tissue"))) #Change k in plot for each loop manually
+
+#Identify which k has the best separation of the expected biological variation. Here we decide k=4
+
+####Prepare batch corrected data
+#Using that k value make the spe_ruv object final, and replace the PCA data with a new PCA
+spe_ruv <- geomxBatchCorrection(spe_batch, factors = "tissue",
+                                NCGs = metadata(spe_batch)$NCGs, k = 4)
+set.seed(100)
+spe_ruv <- scater::runPCA(spe_ruv) #update spe_ruv with new PCA data
+
+pca_results_ruv <- reducedDim(spe_ruv, "PCA") #Extract PCA data
+plotPairPCA(spe_ruv, precomputed = pca_results_ruv, color=tissue,
+            title = "RUV, k=4")
+
+#Using Tissue as factor in geomBatchCorrection instead of SlideNames in the findNCGs()
+#May be alternate approach, however
+#Since SlideNames is our biology of interest, batch factor inducing variable could be tissue
 #But Tissue is another factor of comparison, and not a batch effect inducer
-#So Batch correction is not required
+#So I feel, Batch correction is not required
 
 #Trying Alternate Batch Correction Method Limma
 #Requires: input object &
 #batch: a vector indicating the batch information for all samples;
-#design: a design matrix generated from model.matrix, in the design matrix, all biologically-relevant factors should be included.
+#design: a design matrix generated from model.matrix, 
+#in the design matrix, all biologically-relevant factors should be included.
 
 #Then the different batch correction methods could be compared
 
@@ -712,3 +763,52 @@ fry_res_sig %>%
   theme_bw() +
   coord_flip() +
   ggtitle("Down-regulated")
+
+############################## ---
+#=====DEG with DESeq2 Pipeline ----
+############################## ---
+# Input SpatialExperiment Object: spe_ruv
+fc <- assays(spe_ruv, 1, withDimnames = FALSE)$counts
+fc <- assays(spe_ruv, 2, withDimnames =TRUE, stringsAsFactors=FALSE)$counts
+sapply(assay(spe_ruv, 2, withDimnames =TRUE)$counts, class)
+
+colData <- as.data.frame(spe_ruv@colData@listData)
+colData <- colData %>% dplyr::select(c("SlideName", "Neuron", "tissue", "CD45")) %>% 
+  as.data.frame(.)
+#need to select columns of interest and convert those into factors.
+
+
+library("DESeq2")
+ddsObject <- DESeqDataSetFromMatrix(countData = fc,
+                                    colData = colData,
+                                    design = ~ CD45)
+ddsObject <- DESeqDataSet(seo, design = ~ CD45)
+
+# Create DESeqDataSet object
+ddsObject <- DESeqDataSetFromMatrix(countData = countData,
+                                    colData = colData,
+                                    design = design_formula)
+
+#Keeping rows that have at least 10 reads for a minimum number of samples
+#Minimal number of samples is the smallest group size, eg here 12 of each cellLine
+#..or minimal number of samples for which non-zero counts would be considered interesting; 3 replicates
+if (perform_subset_analysis) {
+  smallestGroupSize <- 3
+} else {
+  smallestGroupSize <- 12
+}
+#counts(ddsObject)
+#keep <-  rowSums(counts(dds2))>= 10
+keep <-  rowSums(counts(ddsObject)>= 10) >= smallestGroupSize
+
+ddsObject_filtered <- ddsObject[keep,]
+
+ddsObject_filtered$drug
+
+#Since we are primarily comparing between different drugs, so our primary level
+#of comparison is drugs, and here reference level is Control 
+#(this only reorders, since the default comparison is with first in the list)
+ddsObject_filtered$drug <- relevel(ddsObject_filtered$drug, ref="Control")
+
+ddsObject_filtered$drug <- droplevels(ddsObject_filtered$drug) #remove the levels (of drug) 
+# ...which do not have samples in the current data set. Here nothing removed
