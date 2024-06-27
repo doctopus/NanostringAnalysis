@@ -78,6 +78,18 @@ install_and_load_packages <- function(cran_packages, bioc_packages) {
   all_packages <- c(cran_packages, bioc_packages)
   sapply(all_packages, require, character.only = TRUE)
 }
+sentence_case <- function(name) { # Sentence case first word if not uppercase with/out numbers/"-" (eg.DN-A1)
+  # Split the sentence into words
+  words <- unlist(strsplit(name, " "))
+  # Check if the first word should be converted
+  first_word <- words[1]
+  if (!grepl("^[A-Z0-9]+$", first_word) && !grepl("-", first_word)) {
+    # Convert the first word to sentence case
+    words[1] <- paste0(toupper(substring(first_word, 1, 1)), tolower(substring(first_word, 2)))
+  }
+  # Join the words back into a sentence
+  return(paste(words, collapse = " "))
+}
 ##### Setup Project ----
 ## Initiate project
 setupProject("NanostringAnalysis") ; print(paste0("Working dir is: ", getwd()))
@@ -767,36 +779,52 @@ fry_res_sig %>%
 ############################## ---
 #=====DEG with DESeq2 Pipeline ----
 ############################## ---
+## Install & Load Packages (DESeq Specific Packages)
+cran_packages <- c("annotate", "circlize", "devtools", "EnhancedVolcano", "ggpubr", "ggrepel", "matrixStats", "pheatmap", "RColorBrewer", "tidyverse", "viridis")
+bioc_packages <- c("apeglm", "clusterProfiler", "ComplexHeatmap", "DESeq2", "DOSE", "enrichplot", "genefilter", "GSVA", "org.Hs.eg.db", "org.Mm.eg.db", "pathview", "xCell")
+install_and_load_packages(cran_packages, bioc_packages)
+
 # Input SpatialExperiment Object: spe_ruv
 fc <- assays(spe_ruv, 1, withDimnames = FALSE)$counts
 fc <- assays(spe_ruv, 2, withDimnames =TRUE, stringsAsFactors=FALSE)$counts
 sapply(assay(spe_ruv, 2, withDimnames =TRUE)$counts, class)
+sapply(countsData, class)
+
+countData <- as.data.frame(counts(spe_ruv))
+str(countData)
 
 colData <- as.data.frame(spe_ruv@colData@listData)
-colData <- colData %>% dplyr::select(c("SlideName", "Neuron", "tissue", "CD45")) %>% 
-  as.data.frame(.)
-#need to select columns of interest and convert those into factors.
+colData <- colData %>% dplyr::select(c("SlideName", "Neuron", "tissue", "CD45"))
 
+colData <- colData %>% mutate(tissue = str_to_sentence(tissue))
+colData <- colData %>% rename(Tissue = tissue)
+colData[,"Neuron"] <- sapply(colData[,"Neuron"], function(x) gsub("-H\\+", "H_POS", as.character(x)))
+colData[,"Neuron"] <- sapply(colData[,"Neuron"], function(x) gsub("-H\\-", "H_NEG", as.character(x)))
+colData[,"CD45"] <- sapply(colData[,"CD45"], function(x) gsub("\\-", "_NEG", as.character(x)))
+colData[,"CD45"] <- sapply(colData[,"CD45"], function(x) gsub("\\+", "_POS", as.character(x)))
 
-library("DESeq2")
-ddsObject <- DESeqDataSetFromMatrix(countData = fc,
-                                    colData = colData,
-                                    design = ~ CD45)
-ddsObject <- DESeqDataSet(seo, design = ~ CD45)
+str(colData)
+#Convert all character columns into factors.
+colData <-  colData %>% mutate_if(is.character, as.factor)
+str(colData)
 
+# library("DESeq2")
 # Create DESeqDataSet object
 ddsObject <- DESeqDataSetFromMatrix(countData = countData,
                                     colData = colData,
-                                    design = design_formula)
+                                    design = ~ CD45)
+# ddsObject <- DESeqDataSet(spe_ruv, design = ~ CD45)
 
 #Keeping rows that have at least 10 reads for a minimum number of samples
 #Minimal number of samples is the smallest group size, eg here 12 of each cellLine
 #..or minimal number of samples for which non-zero counts would be considered interesting; 3 replicates
-if (perform_subset_analysis) {
-  smallestGroupSize <- 3
-} else {
-  smallestGroupSize <- 12
-}
+# if (perform_subset_analysis) {
+#   smallestGroupSize <- 3
+# } else {
+#   smallestGroupSize <- 12
+# }
+
+smallestGroupSize <- 25 #Approx in one group BBP, Sympa etc
 #counts(ddsObject)
 #keep <-  rowSums(counts(dds2))>= 10
 keep <-  rowSums(counts(ddsObject)>= 10) >= smallestGroupSize
@@ -808,7 +836,120 @@ ddsObject_filtered$drug
 #Since we are primarily comparing between different drugs, so our primary level
 #of comparison is drugs, and here reference level is Control 
 #(this only reorders, since the default comparison is with first in the list)
-ddsObject_filtered$drug <- relevel(ddsObject_filtered$drug, ref="Control")
+ddsObject_filtered$CD45 <- relevel(ddsObject_filtered$CD45, ref="CD45_NEG")
 
-ddsObject_filtered$drug <- droplevels(ddsObject_filtered$drug) #remove the levels (of drug) 
+ddsObject_filtered$CD45 <- droplevels(ddsObject_filtered$CD45) #remove the levels (of CD45) 
 # ...which do not have samples in the current data set. Here nothing removed
+
+
+##### DDS Apply Transformation ----
+# Apply transformation & estimate dispersion trend
+# vsd <- vst(dds, blind = FALSE) # VST: Variance Stabilizing Transformation
+rld <- rlog(dds, blind=FALSE) # RLT: Regularized Log Transformation (Selected for this analysis)
+
+head(assay(rld), 2)
+### Heatmaps ----
+#my_colors <- colorRampPalette(c("blue", "white", "red"))(99)
+my_colors <- colorRampPalette(c("white", "#E32600"))(99)
+
+# Extract Transformed values
+#rld<-vst(dds) #estimate dispersion trend and apply a variance stabilizing transformationrld<-vst(dds)
+# Using rld transformed data for the analysis [rld <- rlog(dds)]
+length(rld)
+
+## creating distance matrix (Not Needed)
+sampleDists_subset <- as.matrix(dist(t(assay(rld))))
+hm<-pheatmap::pheatmap(as.matrix(sampleDists_subset),
+                       annotation_col = colData, 
+                       col=my_colors,
+                       main = paste("Distance Matrix"),#, subsetToAnalyze, "Cell Line"),
+                       annotation_legend=TRUE)
+
+#Plot Heatmap of Hierarchical Clustering
+rld_mat <- assay(rld) #Extract the transformed matrix from the object
+rld_cor <- cor(rld_mat) #Compute pairwise correlation values
+head(rld_cor)
+heat.colors <- RColorBrewer::brewer.pal(6, "BrBG")
+pheatmap(rld_cor, 
+         # annotation=colData, 
+         color = heat.colors, border_color = NA,
+         main = paste("Hierarchical Correlation", subsetToAnalyze, "Cell Line"),
+         fontsize = 10, fontsize_row = 10)
+
+## PCA Plot using RLT Transformation #Almost a similar plot
+plotPCArld <- plotPCA(rld, intgroup="CD45", returnData=FALSE, ntop=length(rld)) 
+plotPCArldData <- plotPCA(rld, intgroup="CD45", returnData=TRUE, ntop=length(rld)) 
+pcaRLDAll <- plotPCArld+geom_label_repel(data=plotPCArldData, 
+                                         aes(label=name), 
+                                         min.segment.length = 0.5)+
+  ggtitle(label="PCA Plot of All Genes")+
+  labs(caption = "Regularized Log Transformed (RLT) Count Data") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+        plot.caption = element_text(hjust=1, size = '8', color = 'grey', face = 'italic'))
+
+print(pcaRLDAll)
+
+## PCA Plot using RLD for default top 500 genes
+plotPcaRLD500<-plotPCA(rld, intgroup="CD45", returnData=FALSE)
+plotPcaRLD500Data <- plotPCA(rld, intgroup="CD45", returnData=TRUE)
+pcaRLD500 <- plotPcaRLD500 + geom_label_repel(data=plotPcaRLD500Data, 
+                                              aes(label=name),
+                                              min.segment.length = 0.5,
+                                              max.overlaps = 1)+
+  ggtitle(label="PCA Plot of Top 500 Variable Genes")+
+  labs(caption = "Regularized Log Transformed (RLT) Count Data") +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5,  size = 14, face = "bold"),
+        plot.caption = element_text(hjust=1, size = '8', color = 'grey', face = 'italic'),
+        #panel.grid.major = element_blank(),
+        #panel.grid.minor = element_blank(),
+        #legend.position = "bottom",
+        #strip.background = element_blank(),
+        axis.text = element_text(size = 10)
+        #panel.border = element_rect(color="black"),
+  )
+print(pcaRLD500)
+
+### DEG Prepare Data for Plot (INPUT NEEDED- Define Comparison Groups)----
+ComparisonColumn <- "CD45"
+factor1 <- "CD45_POS" #Choose from 128.10, 128.13 & 130
+factor2 <- "CD45_NEG"
+title <- paste(factor1, "vs", factor2)  
+# resultsNames(dds)
+e <- as.character(c(ComparisonColumn, factor1, factor2))
+#Shrink dds based on comparison data
+res <- lfcShrink(dds, contrast = e, type = "normal") #Shrinked Result (L2FC, padj etc); "normal" algorithm
+
+annotation_colors <- list(
+  drug = c("128.10"="#9FD900", 
+           "128.13"="#FAA800", 
+           "130"="#ff5d8f", 
+           "Control"="#6c757d"),
+  
+  cellLine =c("358"="#006E18", 
+              "318"="#832161")
+)
+icolors <- colorRampPalette(c("blue",
+                              "white",
+                              "red"))(99)
+#Combine shrunk results (with lfc, padj etc with normalized count data)
+resdata <- merge(as.data.frame(res), #Get the counts data alongwith the comparison results
+                 as.data.frame(assay(rld)), #To get transformed count values
+                 #as.data.frame(counts(dds, normalized=FALSE)), #To get original count data
+                 by = "row.names",
+                 sort = FALSE)
+
+names(resdata)[1] <- "EnsembleID" #Rename the first column (Row.names) as EnsembleID
+#Get Bioconductor Annotation Database
+sp <- org.Mm.eg.db
+
+#Add a column of Gene translated from EnsembleID
+resdata$Gene<- mapIds(sp, keys=resdata$EnsembleID, column=c("SYMBOL"), keytype="ENSEMBL", multiVals="first")
+resdata$EntrezID<- mapIds(sp, keys=resdata$EnsembleID, column=c("ENTREZID"), keytype="ENSEMBL", multiVals="first")
+
+resdata <- resdata[order(resdata$padj),] #Order by ascending p-adj significance;low p =significant at top
+resdata <- resdata[complete.cases(resdata$padj),] #Keep rows which have p-adj data
+resdata <- resdata[complete.cases(resdata$Gene),] #Remove rows that don't have assigned genes
+resdata <- resdata[!duplicated(resdata$Gene),] #Remove rows with same gene, keeping significant ones (low padj)
+resdata <- resdata[order(resdata$log2FoldChange),] #Now order per log2FoldChange :Ascending
