@@ -301,8 +301,7 @@ seo
 
 #Examine the data
 assays(seo)
-seo@int_metadata$spatialDataNames
-seo$
+seo$SlideName
 seo$ROILabel
 seo$AOINucleiCount
 names(seo@metadata)
@@ -315,6 +314,7 @@ assay(seo, "counts")[1:5, 1:5]
 assay(seo, "logcounts")[1:5, 1:5]
 #Sample metadata is in the colData object
 colData(seo)[1:5,1:5]
+names(colData(seo))
 #Gene metadata stored in the rowData of the object
 rowData(seo)[1:5,1:5]
 #WTA has NegProbe-WTX data. Ensure that there are no duplicate gene names in the TargetName column
@@ -479,27 +479,27 @@ seoUMAP@colData$tissue
 ####Determine parameter to batch correct
 #To plot all pairPCAs together
 for(i in seq(5)){
-  spe_ruv <- geomxBatchCorrection(spe_batch, factors = "tissue", 
+  spe_ruv <- geomxBatchCorrection(spe_batch, factors = "Neuron", #Or use other variables like tissue, Neuron, 
                                   NCGs = metadata(spe_batch)$NCGs, k = i)
   
-  print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = Type, title = paste0("k = ", i)))
+  print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = Neuron, title = paste0("k = ", i)))
   
 }
 
 #Else, print each one separately by changing k each time
-spe_ruv <- geomxBatchCorrection(spe_batch, factors = "tissue", #factors of interest
-                                NCGs = metadata(spe_batch)$NCGs, k =5)
+spe_ruv <- geomxBatchCorrection(spe_batch, factors = "Neuron", #factors of interest
+                                NCGs = metadata(spe_batch)$NCGs, k =2)
 ## geomxBatchCorrection adds colData 5 data points: ruv_W1 to ruv_W5
 
-print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = tissue,
-                  title = paste0("k = 5 : tissue"))) #Change k in plot for each loop manually
+print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = Neuron,
+                  title = paste0("k = 2 : Neuron"))) #Change k in plot for each loop manually
 
 #Identify which k has the best separation of the expected biological variation. Here we decide k=4
 
 ####Prepare batch corrected data
 #Using that k value make the spe_ruv object final, and replace the PCA data with a new PCA
-spe_ruv <- geomxBatchCorrection(spe_batch, factors = "tissue",
-                                NCGs = metadata(spe_batch)$NCGs, k = 4)
+spe_ruv <- geomxBatchCorrection(spe_batch, factors = "Neuron",  #Select any factor such as tissue or Neuron
+                                NCGs = metadata(spe_batch)$NCGs, k = 2)
 set.seed(100)
 spe_ruv <- scater::runPCA(spe_ruv) #update spe_ruv with new PCA data
 
@@ -525,7 +525,7 @@ plotPairPCA(spe_ruv, precomputed = pca_results_ruv, color=tissue,
 ##############################
 #DEG with limma-voom pipeline (Alternatives: edgeR, DESeq2)
 ##############################
-#Normalized counts should not be used in linear moodelling, rather the weight matrix
+#Normalized counts should not be used in linear modelling, rather the weight matrix
 #...generated from geomBatchCorrection should be used as covariates
 #Weight matrix can be found as following **from Batch Corrected Data**
 colData(spe_ruv)[,seq(ncol(colData(spe_ruv))-1, ncol(colData(spe_ruv)))] |>head()
@@ -543,11 +543,16 @@ dge <- SE2DGEList(spe_ruv)
 colnames(colData(spe_ruv))
 names(metadata(spe_ruv))
 
+
+##### 1 BEGIN: Workflow Beginning for Each New Set of Design Compare----
 #Adding W matrices resulting from RUV4 to the model matrix as covariates to use the batch corrected data
-design <- model.matrix(~0 + tissue + ruv_W4 + ruv_W5, data = colData(spe_ruv))
+design <- model.matrix(~0 + Neuron + ruv_W1 + ruv_W2, data = colData(spe_ruv)) #Select Any factor for comparison like tissue, Neuron
 colnames(design)
 #Rename by removing the tissue prefix
-colnames(design) <- gsub("^tissue", "", colnames(design))
+# colnames(design) <- gsub("^tissue", "", colnames(design))
+colnames(design) <- gsub("^Neuron", "", colnames(design))
+colnames(design) <- gsub("-H\\+", "H_POS", colnames(design))
+colnames(design) <- gsub("-H\\-", "H_NEG", colnames(design))
 
 #Create alternative Design file for DESeq2
 design_mods <- as.data.frame(design) %>%
@@ -559,24 +564,26 @@ design_mods <- as.data.frame(design) %>%
   arrange(RowName) %>%
   column_to_rownames("RowName") #Convert back to row names
 
-
+#The comparison matrix is setup using makeContrasts function from Limma
 #To compare Tumor with Tumor Edge
 contr.matrix <- makeContrasts(
-  TvE = tumor - tumor_edge,
+  HvN = NFH_NEG - NFH_POS,
   levels = colnames(design))
 
-#Reduce the number of genes with low coverage for accurate mean variance relationship
+#Filter out the number of genes with low coverage for accurate mean variance relationship
+#..using filterByExpr function of egdeR package
 keep <- filterByExpr(dge, design)
-table(keep) #Shows no gene is excluded, all 19948 genes kept
-rownames(dge)[!keep] #remove any gene with low expression; here nothing will be removed
-dge_all <- dge[keep, ]
+table(keep) #Shows 1128 genes are excluded, from the total 19948 genes
 
-#Biological CV (BCV) is the coeficient of variation with with the (unknown) true abundance
+
+rownames(dge)[!keep] #remove any gene with low expression
+dge_all <- dge[keep, ]
+names(dge_all) #Had 3 cols: "counts"  "samples" "genes" 
+###QC: Biological CV (BCV) is the coefficient of variation with which the (unknown) true abundance
 #...of the gene varies between replicate RNA samples.
 #BCV Check
 dge_all <- estimateDisp(dge_all, design = design, robust = TRUE)
-names(dge_all)
-
+names(dge_all) # added 9 cols like "design", "common.dispersion", "trended.dispersion", "tagwise.dispersion", "AveLogCPM", "trend.method", "prior.df", "prior.n", "span"
 
 plotBCV(dge_all, legend.position = "topleft", ylim = c(0, 1.3))
 
@@ -590,7 +597,7 @@ bcv_df <- data.frame(
  points(highbcv_df$AveLogCPM, highbcv_df$BCV, col = "red")
  text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4)
 
-#Differential Expression
+#### Differential Expression ----
 #In the limma-voom pipeline, linear modelling is carried out on the log-CPM values by using 
 # ...the voom, lmFit, contrasts.fit and eBayes functions.
 v <- voom(dge_all, design, plot = TRUE) #Variance Trend
@@ -601,65 +608,129 @@ efit <- eBayes(fit_contrast, robust = TRUE)
 
 results_efit <- decideTests(efit, p.value = 0.05)
 summary_efit <- summary(results_efit)
-summary_efit #Shows that between the TvE contast group, how many genes are up and downregulated
+summary_efit #Shows that between the HvN contast group, how many genes are up and downregulated
 
-#Visualization
+#### Visualization
 # library(ggrepel)
 # library(tidyverse)
-de_results_TvE <- topTable(efit, coef = 1, sort.by = "P", n = Inf)
+de_results_HvN <- topTable(efit, coef = 1, sort.by = "P", n = Inf)
 
-de_genes_toptable_TvE <- topTable(efit, coef = 1, sort.by = "P", n = Inf, p.value = 0.05)
+de_genes_toptable_HvN <- topTable(efit, coef = 1, sort.by = "P", n = Inf, p.value = 0.05)
 
-de_results_TvE %>% 
+de_results_HvN %>% 
   mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
                      ifelse(logFC<0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
   ggplot(aes(AveExpr, logFC, col = DE)) +
   geom_point(shape = 1, size = 1) +
-  geom_text_repel(data = de_genes_toptable_TvE %>% 
+  geom_text_repel(data = de_genes_toptable_HvN %>% 
                     mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
                                        ifelse(logFC < 0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
                     rownames_to_column(), aes(label = rowname)) +
   theme_bw() +
   xlab("Average log-expression") +
   ylab("Log-fold-change") +
-  ggtitle("Tumor vs Tumor_Edge") +
+  ggtitle("NF-H-Negative vs NF-H-Positive") +
   scale_color_manual(values = c("blue", "grey", "red")) +
   theme(text = element_text(size=15),
         plot.title = element_text(hjust = 0.5))
 
-#Second set of comparison
+#### Second set of comparison Between SlideNames ---
+
+
+
+##### 2 BEGIN: SlideName: Workflow Beginning for Each New Set of Design Compare----
+#Adding W matrices resulting from RUV4 to the model matrix as covariates to use the batch corrected data
+design <- model.matrix(~0 + SlideName + ruv_W1 + ruv_W2, data = colData(spe_ruv)) #Select Any factor for comparison like tissue, Neuron
+colnames(design)
+#Rename by removing the tissue prefix
+colnames(design) <- gsub("^SlideName", "", colnames(design))
+# colnames(design) <- gsub("-H\\+", "H_POS", colnames(design))
+# colnames(design) <- gsub("-H\\-", "H_NEG", colnames(design))
+
+#Create alternative Design file for DESeq2
+design_mods <- as.data.frame(design) %>%
+  rownames_to_column("RowName") %>%        #Convert row names to a column
+  mutate(Sample = gsub(" \\|.*", "", RowName)) %>%  #Extract the part before the first pipe
+  pivot_longer(cols = tumor:tumor_gland, names_to = "Tissue", values_to = "Value") %>%
+  filter(Value == 1) %>%
+  select(-Value) %>%
+  arrange(RowName) %>%
+  column_to_rownames("RowName") #Convert back to row names
+
+####For Within one group comparisons start here.
+#The comparison matrix is setup using makeContrasts function from Limma
+#To compare Tumor with Tumor Edge
+factor1 = "BBP"
+factor2= "FP"
+
+title <- paste(factor1, "vs", factor2)  
+# # resultsNames(dds)
+# e <- as.formula(paste0(factor1, "-", factor2))
+
 
 contr.matrix2 <- makeContrasts(
-  TvEG = tumor - tumor_edge_with_gland,
+  BBPvsFP = BBP - FP,
   levels = colnames(design))
 
-fit_contrast2 <- contrasts.fit(fit, contrasts = contr.matrix2)
-efit2 <- eBayes(fit_contrast2, robust = TRUE)
+#Filter out the number of genes with low coverage for accurate mean variance relationship
+#..using filterByExpr function of egdeR package
+keep <- filterByExpr(dge, design)
+table(keep) #Shows 893 genes are excluded, from the total 19948 genes (Same for the same column)
 
-results_efit2 <- decideTests(efit2, p.value = 0.5)
-summary_efit2 <- summary(results_efit2)
-summary_efit2 #Shows that between the TvEG contrast group, how many genes are up and down regulated
+rownames(dge)[!keep] #remove any gene with low expression
+dge_all <- dge[keep, ]
+names(dge_all) #Had 3 cols: "counts"  "samples" "genes" 
+###QC: Biological CV (BCV) is the coefficient of variation with which the (unknown) true abundance
+#...of the gene varies between replicate RNA samples.
+#BCV Check
+dge_all <- estimateDisp(dge_all, design = design, robust = TRUE)
+names(dge_all) # added 9 cols like "design", "common.dispersion", "trended.dispersion", "tagwise.dispersion", "AveLogCPM", "trend.method", "prior.df", "prior.n", "span"
 
-#Visualization
+plotBCV(dge_all, legend.position = "topleft", ylim = c(0, 1.3), main = title)
+
+bcv_df <- data.frame(
+  'BCV' = sqrt(dge_all$tagwise.dispersion),
+  'AveLogCPM' = dge_all$AveLogCPM,
+  'gene_id' = rownames(dge_all)
+)
+highbcv <- bcv_df$BCV >0.8
+highbcv_df <- bcv_df[highbcv, ]
+points(highbcv_df$AveLogCPM, highbcv_df$BCV, col = "red")
+text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4)
+
+#### Differential Expression ----
+#In the limma-voom pipeline, linear modelling is carried out on the log-CPM values by using 
+# ...the voom, lmFit, contrasts.fit and eBayes functions.
+v <- voom(dge_all, design, plot = TRUE) #Variance Trend
+
+fit <- lmFit(v)
+fit_contrast <- contrasts.fit(fit, contrasts = contr.matrix2) #Change Contr.Matrix for each Comparison
+efit <- eBayes(fit_contrast, robust = TRUE)
+
+results_efit <- decideTests(efit, p.value = 0.05)
+summary_efit <- summary(results_efit)
+summary_efit #Shows that between the HvN contast group, how many genes are up and downregulated
+
+#### Visualization
 # library(ggrepel)
 # library(tidyverse)
-de_results_TvEG <- topTable(efit2, coef = 1, sort.by = "P", n = Inf)
+de_results_HvN <- topTable(efit, coef = 1, sort.by = "P", n = Inf)
 
-de_genes_toptable_TvEG <- topTable(efit2, coef = 1, sort.by = "P", n = Inf, p.value = 0.05)
+de_genes_toptable_HvN <- topTable(efit, coef = 1, sort.by = "P", n = Inf, p.value = 0.05)
 
-de_results_TvEG %>% 
+de_results_HvN %>% 
   mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
                      ifelse(logFC<0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
   ggplot(aes(AveExpr, logFC, col = DE)) +
   geom_point(shape = 1, size = 1) +
-  geom_text_repel(data = de_genes_toptable_TvEG %>% 
+  geom_text_repel(data = de_genes_toptable_HvN %>% 
                     mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
                                        ifelse(logFC < 0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
                     rownames_to_column(), aes(label = rowname)) +
   theme_bw() +
   xlab("Average log-expression") +
   ylab("Log-fold-change") +
-  ggtitle("Tumor vs Tumor_Edge_With_Gland") +
+  ggtitle(title) + #Change for Each Comparison
   scale_color_manual(values = c("blue", "grey", "red")) +
   theme(text = element_text(size=15),
         plot.title = element_text(hjust = 0.5))
@@ -667,45 +738,7 @@ de_results_TvEG %>%
 
 
 
-#Third set of comparison
-
-contr.matrix3 <- makeContrasts(
-  TvG = tumor - tumor_gland,
-  levels = colnames(design))
-
-fit_contrast3 <- contrasts.fit(fit, contrasts = contr.matrix3)
-efit3 <- eBayes(fit_contrast3, robust = TRUE)
-
-results_efit3 <- decideTests(efit3, p.value = 0.5)
-summary_efit3 <- summary(results_efit3)
-summary_efit3 #Shows that between the TvEG contrast group, how many genes are up and down regulated
-
-#Visualization
-# library(ggrepel)
-# library(tidyverse)
-de_results_TvG <- topTable(efit3, coef = 1, sort.by = "P", n = Inf)
-
-de_genes_toptable_TvG <- topTable(efit3, coef = 1, sort.by = "P", n = Inf, p.value = 0.05)
-
-de_results_TvG %>% 
-  mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
-                     ifelse(logFC<0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
-  ggplot(aes(AveExpr, logFC, col = DE)) +
-  geom_point(shape = 1, size = 1) +
-  geom_text_repel(data = de_genes_toptable_TvG %>% 
-                    mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
-                                       ifelse(logFC < 0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
-                    rownames_to_column(), aes(label = rowname)) +
-  theme_bw() +
-  xlab("Average log-expression") +
-  ylab("Log-fold-change") +
-  ggtitle("Tumor vs Tumor_Gland") +
-  scale_color_manual(values = c("blue", "grey", "red")) +
-  theme(text = element_text(size=15),
-        plot.title = element_text(hjust = 0.5))
-
-
-#Gene Set Enrichment Analysis
+############Gene Set Enrichment Analysis----
 #Using fry from limma package
 #Load Gene sets
 library(msigdb)
@@ -831,12 +864,12 @@ keep <-  rowSums(counts(ddsObject)>= 10) >= smallestGroupSize
 
 ddsObject_filtered <- ddsObject[keep,]
 
-ddsObject_filtered$drug
+names(ddsObject_filtered@colData)
 
-#Since we are primarily comparing between different drugs, so our primary level
-#of comparison is drugs, and here reference level is Control 
+#Since we are primarily comparing between different groups such as Neuron Slide etc, 
+#so our primary level of comparison is that comparison, need to define reference level
 #(this only reorders, since the default comparison is with first in the list)
-ddsObject_filtered$CD45 <- relevel(ddsObject_filtered$CD45, ref="CD45_NEG")
+ddsObject_filtered$Neuron <- relevel(ddsObject_filtered$Neuron, ref="NFH_NEG")
 
 ddsObject_filtered$CD45 <- droplevels(ddsObject_filtered$CD45) #remove the levels (of CD45) 
 # ...which do not have samples in the current data set. Here nothing removed
