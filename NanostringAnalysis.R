@@ -299,7 +299,7 @@ seo <- readGeoMx(countFile = final_countFile,
 # library(SpatialExperiment)
 seo
 
-#Examine the data
+###Examine the data (Optional: To understand the structure)----
 assays(seo)
 seo$SlideName
 seo$ROILabel
@@ -355,6 +355,7 @@ metadata(seo) |>names()
 # plotGeneQC(seo_qc, ordannots = "regions", col = regions, point_size = 2)
 plotGeneQC(seo_qc)
 plotGeneQC(seo_qc, top_n=12, ordannots = "tissue", col = tissue, point_size = 2)
+sapply(seo_qc@colData, class)
 
 #colData(seo)$regions
 #colnames(seo) %>% print() 
@@ -363,7 +364,7 @@ plotGeneQC(seo_qc, top_n=12, ordannots = "tissue", col = tissue, point_size = 2)
 # seo_subset <-  addPerROIQC(seo_qc) #Wrong; already done this step to get seo_qc
 # plotGeneQC(seo_subset)
 
-
+#Final data of this segment: seo_qc
 #### ROI level QC ----
 plotROIQC(seo_qc, x_threshold = 150, color = SlideName)
 
@@ -436,7 +437,36 @@ plotDR(seoUMAP, dimred = "UMAP", col = tissue)
 plotDR(seoUMAP, dimred = "UMAP", col = SlideName)
 
 
+# ↓ ↓~~~~~~~~~~~~~~~~~~~
+Counts_Data <- as.data.frame(counts(seoUMAP))
+Counts_Data <- as.data.frame(cbind(Gene=rownames(Counts_Data), Counts_Data))
+NORMALIZATION <- "upperquartile"
 
+seoUMAP_Normalized <- geomxNorm(seoUMAP, method=NORMALIZATION, log = T)
+
+Normalized_Counts_Data <- as.data.frame(logcounts(seoUMAP_Normalized))
+##(SKIP IF NOT SAVING Normalized Count Data)Generate a Gene Column for Data Saving ----
+Normalized_Counts_Data <- as.data.frame(cbind(Gene=rownames(Normalized_Counts_Data), Normalized_Counts_Data))
+#Write Data
+write.table(Normalized_Counts_Data, paste(output_dir, NORMALIZATION, "_Normalized_Counts.txt", sep=""), 
+            sep="\t", row.names = F, col.names = T, quote = T)
+#Read Data
+Normalized_Counts_Data <- read.delim(paste(output_dir, NORMALIZATION, "_Normalized_Counts.txt", sep=""), 
+            sep="\t", header = T, check.names = F, stringsAsFactors = F)
+#Assign the rownames back as Genes
+rownames(Normalized_Counts_Data) <- Normalized_Counts_Data[,"Gene"]
+#Remove the Gene Column
+Normalized_Counts_Data[,"Gene"] <- NULL
+
+##Make Feature Data ----
+Feature_Data <- as.data.frame(rowData(seoUMAP_Normalized))
+Feature_Data <- as.data.frame(cbind(Gene=rownames(Feature_Data), Feature_Data))
+
+Sample_Data <- as.data.frame(colData(seoUMAP_Normalized))
+Sample_Data <- as.data.frame(cbind(ROI=rownames(Sample_Data), Sample_Data))
+
+
+#↑ ↑~~~~~~~~~~~~~~~~~~
 #### Normalization########----
 #Data has become seoUMAP now with addition of two reducedDimNames PCA and UMAP
 #names(seoUMAP@metadata)
@@ -445,9 +475,105 @@ seo_tmm <- geomxNorm(seoUMAP, method = "TMM") #TMM Normalization
 
 #names(seo_tmm@metadata)
 plotRLExpr(seo_tmm, assay = 2, color = tissue) + ggtitle("TMM")
-
 plotRLExpr(seo_tmm, assay = 2, color = SlideName) + ggtitle("TMM")
+#↓ ↓~~~~~~~~~~~~~~~~~~~~~
+library(patchwork)
 
+ROI_ANNOTATION_COLS <- c("SlideName", "ScanLabel", "Neuron", "tissue", "CD45")
+i = 1
+
+for(i in 1:length(ROI_ANNOTATION_COLS)){
+  GRP <- ROI_ANNOTATION_COLS[i]
+  print(GRP)
+  
+  RLE_PLOT <- plotRLExpr(seo_tmm, assay = 2, ordannots=GRP, color=get(GRP)) + ggtitle(paste("TMM", GRP, "RLE"))
+  PCA_SCREE_PLOT <- plotScreePCA(seo_tmm, assay=2, dims=10)
+  PAIRWISE_PCA <- plotPairPCA(seo_tmm, title=GRP, col=get(GRP), shape=get(GRP), assay=2, n_dimension=3)
+  PCA_BI_PLOT <- plotPCAbiplot(seo_tmm, n_loadings=10, assay=2, col=get(GRP))
+  MultiDIM_SCALING_PLOT <- standR::plotMDS(seo_tmm, assay=2, col=get(GRP), shape=get(GRP))
+  UMAP <- plotDR(seo_tmm, dimred="UMAP", col=get(GRP))
+  
+  graphics.off() #Set up the PDF output
+  pdf(paste(output_dir, "TMM", GRP, ".pdf", sep = ""), width=15, height=20)
+  combined_plot <- (
+    (RLE_PLOT / PCA_SCREE_PLOT / PAIRWISE_PCA) /
+      (PCA_BI_PLOT + MultiDIM_SCALING_PLOT + UMAP)
+  ) +
+    plot_layout(ncol = 1, guides = 'collect')
+  
+  print(combined_plot) #Print the combined plot to the PDF
+  graphics.off() # Close the PDF device
+}
+
+## ssGSEA Analysis
+MSIG_DB <- paste0(input_dir, "/MSIG_DB/")
+GeneSets <- list.files(MSIG_DB, pattern= "*.gmt", full.names = F)
+BiocManager::install("qusage")
+library("qusage")
+geneset =1
+#TODO-STARTS Error in gsva parameters ?gsva
+# Error in gsva(as.matrix(Normalized_Counts_Data), Signature, method = "ssgsea",  : 
+                # Calling gsva(expr=., gset.idx.list=., method=., ...) is defunct; use a method-specific parameter object (see '?gsva').
+#TODO-ENDS
+for (geneset in 1:length(GeneSets)){
+  geneset_name = gsub("\\.","_", 
+                      gsub(".v2023.2.Mm.symbols.gmt", "", GeneSets[geneset]))
+  print(geneset_name)
+  ####
+  gset_mouse=paste(MSIG_DB, GeneSets[geneset], sep = "")
+  Signature <- qusage::read.gmt(gset_mouse)
+  ####
+  ssGSEAScores <- gsva(as.matrix(Normalized_Counts_Data), 
+                       Signature, 
+                       method="ssgsea",
+                       ssgsea.norm=FALSE,
+                       kcdf="Gaussian")
+  ssGSEAScores <- as.data.frame(ssGSEAScores)
+  
+  ##(SKIP IF NOT SAVING ssGSEAScores.txt)
+  # ssGSEAScores <- as.data.frame(cbind(GSET=rownames(ssGSEAScores), ssGSEAScores))
+  # write.table(ssGSEAScores, paste(output_dir, geneset_name, "_ssGSEAScores.txt", sep=""),
+  #             sep = "\t", row.names = F, col.names = T)
+  # INPUT_DF <- NULL
+  # INPUT_DF <-  ssGSEAScores
+  # rownames(INPUT_DF) <- INPUT_DF[,1]
+  # INPUT_DF[,1] <- NULL
+  
+  INPUT_DF <- ssGSEAScores
+  rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("HALLMARK_","",as.character(x)))
+  rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("REACTOME_","",as.character(x)))
+  rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("BIOCARTA_","",as.character(x)))
+  rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("WP_","",as.character(x)))
+  rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("TABULA_MURIS_SENIS_","",as.character(x)))
+  rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("DESCARTES_","",as.character(x)))
+  rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("ZHANG_","",as.character(x)))
+  ###########################
+  COL_ANNOT <- NULL
+  COL_ANNOT = Sample_Data[,c("ROI","ScanLabel","Neuron","tissue","CD45")]
+  COL_ANNOT[,"Group"] <- COL_ANNOT[,"ScanLabel"]
+  rownames(COL_ANNOT) <- COL_ANNOT[,"ROI"]
+  COL_ANNOT[,"ROI"] <- NULL
+  ##########################
+  No_Of_Rows = 100
+  UNIT = geneset_name
+  #########################3
+  
+  ssGSEA_SCORES <- heatmap_func_ss(Input_DF,COL_ANNOT,100)
+  
+  #NCOLS = as.character(length(Heatmap_Data[,1]))
+  #NROWS = as.character(length(Heatmap_Data[1,]))
+  #######################################
+  graphics.off()
+  pdf(paste(output_dir,geneset_name,"_ssGSEAScores.pdf",sep=""),width =60,height =30)
+  draw(ssGSEA_SCORES,padding = unit(c(1,5,1,1), "in"),heatmap_legend_side = "right",row_title = "", row_title_gp = gpar(col = "red"),legend_grouping = "original",
+       column_title = paste(Project_Name,"\n",UNIT,"\n",sep=""), column_title_gp = gpar(fontsize = 32))
+  graphics.off()
+  #####################################
+}
+
+
+
+##↑ ↑~~~~~~~~~~~~~~~~~~~~~~
 
 #Do PCA plot of the geomxNorm'ed data (to see only, not intended to add data to object)
 spe_tmm <- scater::runPCA(seo_tmm)
@@ -856,7 +982,8 @@ ddsObject <- DESeqDataSetFromMatrix(countData = countData,
 # } else {
 #   smallestGroupSize <- 12
 # }
-
+## Make the previously made spe_ruv as the dds object
+ddsObject <- spe_ruv
 smallestGroupSize <- 25 #Approx in one group BBP, Sympa etc
 #counts(ddsObject)
 #keep <-  rowSums(counts(dds2))>= 10
@@ -865,16 +992,23 @@ keep <-  rowSums(counts(ddsObject)>= 10) >= smallestGroupSize
 ddsObject_filtered <- ddsObject[keep,]
 
 names(ddsObject_filtered@colData)
-
+typeof(ddsObject_filtered@colData$SlideName)
+ddsObject_filtered@colData$SlideName
+ddsObject_filtered@colData$SlideName <- as.factor(ddsObject_filtered@colData$SlideName)
 #Since we are primarily comparing between different groups such as Neuron Slide etc, 
 #so our primary level of comparison is that comparison, need to define reference level
 #(this only reorders, since the default comparison is with first in the list)
-ddsObject_filtered$Neuron <- relevel(ddsObject_filtered$Neuron, ref="NFH_NEG")
+ddsObject_filtered$SlideName <- relevel(ddsObject_filtered$SlideName, ref="BBP")
 
-ddsObject_filtered$CD45 <- droplevels(ddsObject_filtered$CD45) #remove the levels (of CD45) 
+ddsObject_filtered$SlideName <- droplevels(ddsObject_filtered$SlideName) #remove the levels (of CD45) 
 # ...which do not have samples in the current data set. Here nothing removed
 
+##### Run DESeq2 Analysis ----
+dds <- DESeq(ddsObject_filtered)
 
+sapply(spe_ruv@assays@data$counts, class)
+spe_ruv@assays@data$counts <- as.numeric(unlist(spe_ruv@assays@data$counts))
+dds <- DESeqDataSet(spe_ruv)
 ##### DDS Apply Transformation ----
 # Apply transformation & estimate dispersion trend
 # vsd <- vst(dds, blind = FALSE) # VST: Variance Stabilizing Transformation
