@@ -90,6 +90,116 @@ sentence_case <- function(name) { # Sentence case first word if not uppercase wi
   # Join the words back into a sentence
   return(paste(words, collapse = " "))
 }
+heatmap_func_ss <- function(Input_DF,COL_ANNOT, NoofRows){
+  Heatmap_Data <- Input_DF
+  Heatmap_Data <- Heatmap_Data[order(matrixStats:::rowVars(as.matrix(Heatmap_Data)),decreasing = T),]
+  Heatmap_Data <- Heatmap_Data[c(1:No_Of_Rows),]
+  Heatmap_Data <- Heatmap_Data[rowSums(is.na(Heatmap_Data)) != ncol(Heatmap_Data), ]
+  Heatmap_Data <- as.data.frame(t(scale(t(Heatmap_Data))))
+  Heatmap_Data <- as.data.frame(t(Heatmap_Data))
+  col = 1
+  for(col in length(Heatmap_Data[1,]):1){
+    print(col)
+    Column_Name = colnames(Heatmap_Data)[col]
+    print(Column_Name)
+    Heatmap_Data <- Heatmap_Data[order(Heatmap_Data[,Column_Name],decreasing = T),]
+  }
+  
+  Heatmap_Data <- as.data.frame(t(Heatmap_Data))
+  
+  col = 1
+  for(col in length(Heatmap_Data[1,]):1){
+    print(col)
+    Column_Name = colnames(Heatmap_Data)[col]
+    print(Column_Name)
+    Heatmap_Data <- Heatmap_Data[order(Heatmap_Data[,Column_Name],decreasing = T),]
+  }
+  
+  
+  ##########################
+  Heatmap_Annotation_Data <- COL_ANNOT
+  ################################
+  REQD_SAMPLES <- as.character(intersect(rownames(COL_ANNOT),colnames(Heatmap_Data)))
+  ################################
+  Heatmap_Annotation_Data <- Heatmap_Annotation_Data[REQD_SAMPLES,]
+  Heatmap_Data <- Heatmap_Data[,REQD_SAMPLES]
+  ##########################3
+  
+  Color_Sets <- list(brewer.pal(12,"Set1"),
+                     brewer.pal(12,"Accent"),
+                     brewer.pal(12,"Paired"),
+                     brewer.pal(12,"Dark2")
+  )
+  
+  
+  Color_Set1 <- Color_Sets[[1]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"ScanLabel"]),"ScanLabel"])))]
+  names(Color_Set1) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"ScanLabel"]),"ScanLabel"])
+  
+  Color_Set2 <- Color_Sets[[2]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Neuron"]),"Neuron"])))]
+  names(Color_Set2) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Neuron"]),"Neuron"])
+  
+  Color_Set3 <- Color_Sets[[3]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"tissue"]),"tissue"])))]
+  names(Color_Set3) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"tissue"]),"tissue"])
+  
+  Color_Set4 <- Color_Sets[[4]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"CD45"]),"CD45"])))]
+  names(Color_Set4) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"CD45"]),"CD45"])
+  
+  
+  
+  HEATMAP_ANNOTAION <- HeatmapAnnotation(ScanLabel=as.character(Heatmap_Annotation_Data[,"ScanLabel"]),
+                                         Neuron=as.character(Heatmap_Annotation_Data[,"Neuron"]),
+                                         tissue=as.character(Heatmap_Annotation_Data[,"tissue"]),
+                                         CD45=as.character(Heatmap_Annotation_Data[,"CD45"]),
+                                         col = list(ScanLabel=Color_Set1,
+                                                    Neuron=Color_Set2,
+                                                    tissue=Color_Set3,
+                                                    CD45=Color_Set4))
+  
+  
+  
+  
+  col_fun = colorRamp2(c(min(Heatmap_Data,na.rm = T), 0, max(Heatmap_Data,na.rm = T)), c("blue", "white", "red"))
+  
+  Heatmap_Data <- Heatmap_Data[,rownames(Heatmap_Annotation_Data)]
+  
+  INPUT_DATA_HEATMAP <- Heatmap(as.matrix(Heatmap_Data),
+                                #width = unit(40, "cm"),height = unit(40, "cm"),
+                                #right_annotation = Heatmap_rowAnnotation,
+                                top_annotation = HEATMAP_ANNOTAION,    
+                                border_gp = gpar(col = "black", lwd = 2),
+                                grid.rect(gp = gpar(lwd = 2, fill = "transparent")),
+                                name = UNIT,
+                                #row_split = IC50_HEATMAP_ROWSPLIT[,"RowOrder"],
+                                column_split = Heatmap_Annotation_Data[,c("Group")],
+                                rect_gp = gpar(col = "black", lwd =0.2),
+                                row_gap = unit(5, "mm"),
+                                column_title = " ",
+                                column_title_side = "top",
+                                row_title = " ", row_title_rot = 90,
+                                col = col_fun,
+                                row_names_gp = gpar(fontsize = 12,just = "center",fontface ="bold"),
+                                column_names_gp = gpar(fontsize = 14,just = "center",fontface ="bold"),
+                                column_title_gp = gpar(fontsize = 14,just = "center",fontface ="bold"),
+                                row_title_gp = gpar(fontsize = 14,just = "center",fontface ="bold"),
+                                column_names_side = "bottom",
+                                na_col = "grey90",
+                                cluster_rows = T,
+                                cluster_columns = T,
+                                show_row_dend = T,
+                                show_column_dend = T,
+                                column_names_centered = TRUE,
+                                column_names_max_height = unit(12, "cm"),
+                                show_row_names = T,
+                                row_names_side = "left",
+                                column_names_rot = 90,
+                                show_column_names = T,
+                                heatmap_legend_param = list(direction = "vertical")
+  )
+  
+  
+  return(INPUT_DATA_HEATMAP)
+}
+
 ##### Setup Project ----
 ## Initiate project
 setupProject("NanostringAnalysis") ; print(paste0("Working dir is: ", getwd()))
@@ -437,7 +547,7 @@ plotDR(seoUMAP, dimred = "UMAP", col = tissue)
 plotDR(seoUMAP, dimred = "UMAP", col = SlideName)
 
 
-# ↓ ↓~~~~~~~~~~~~~~~~~~~
+# ↓ ↓~~~~~~~~~~~~~~~~~~~ ----
 Counts_Data <- as.data.frame(counts(seoUMAP))
 Counts_Data <- as.data.frame(cbind(Gene=rownames(Counts_Data), Counts_Data))
 NORMALIZATION <- "upperquartile"
@@ -470,7 +580,8 @@ Sample_Data <- as.data.frame(cbind(ROI=rownames(Sample_Data), Sample_Data))
 #### Normalization########----
 #Data has become seoUMAP now with addition of two reducedDimNames PCA and UMAP
 #names(seoUMAP@metadata)
-seo_tmm <- geomxNorm(seoUMAP, method = "TMM") #TMM Normalization
+NORMALIZATION_METHOD <- "TMM"
+seo_tmm <- geomxNorm(seoUMAP, method = NORMALIZATION_METHOD) #TMM Normalization
 #geomxNorm Adds two more items to metadata: norm.factor, norm.method
 
 #names(seo_tmm@metadata)
@@ -494,7 +605,7 @@ for(i in 1:length(ROI_ANNOTATION_COLS)){
   UMAP <- plotDR(seo_tmm, dimred="UMAP", col=get(GRP))
   
   graphics.off() #Set up the PDF output
-  pdf(paste(output_dir, "TMM", GRP, ".pdf", sep = ""), width=15, height=20)
+  pdf(paste(output_dir,"/", NORMALIZATION_METHOD, "_NORMALIZED_", GRP, ".pdf", sep = ""), width=15, height=20)
   combined_plot <- (
     (RLE_PLOT / PCA_SCREE_PLOT / PAIRWISE_PCA) /
       (PCA_BI_PLOT + MultiDIM_SCALING_PLOT + UMAP)
@@ -506,28 +617,46 @@ for(i in 1:length(ROI_ANNOTATION_COLS)){
 }
 
 ## ssGSEA Analysis
-MSIG_DB <- paste0(input_dir, "/MSIG_DB/")
-GeneSets <- list.files(MSIG_DB, pattern= "*.gmt", full.names = F)
+library("RColorBrewer")
+install.packages("colorRamp2")
+library("colorRamp2")
 BiocManager::install("qusage")
 library("qusage")
+
+MSIG_DB <- paste0(input_dir, "/MSIG_DB/")
+GeneSets <- list.files(MSIG_DB, pattern= "*.gmt", full.names = F)
+MSigDB_Dictionary <- list(mh_all="HallMark Gene Sets", 
+                          m2_cp_biocarta="BioCarta subset of Canonical Pathways",
+                          m2_cp_reactome="Reactome subset of Canonical Pathways",
+                          m2_cp_wikipathways="WikiPathways subset of Canonical Pathways",
+                          m8_all="Cell Type Signature Gene Sets")
+#MSigDB_Dictionary$m8.all
+
 geneset =1
-#TODO-STARTS Error in gsva parameters ?gsva
-# Error in gsva(as.matrix(Normalized_Counts_Data), Signature, method = "ssgsea",  : 
-                # Calling gsva(expr=., gset.idx.list=., method=., ...) is defunct; use a method-specific parameter object (see '?gsva').
-#TODO-ENDS
 for (geneset in 1:length(GeneSets)){
-  geneset_name = gsub("\\.","_", 
+  # geneset_name <-  "m2_cp_biocarta" #For Non-loop version
+  geneset_name = gsub("\\.","_",
                       gsub(".v2023.2.Mm.symbols.gmt", "", GeneSets[geneset]))
+  
   print(geneset_name)
   ####
   gset_mouse=paste(MSIG_DB, GeneSets[geneset], sep = "")
+  # Signature <- qusage::read.gmt(paste(MSIG_DB,"m2.cp.biocarta.v2023.2.Mm.symbols.gmt", sep="")) #Non-loop version
   Signature <- qusage::read.gmt(gset_mouse)
   ####
-  ssGSEAScores <- gsva(as.matrix(Normalized_Counts_Data), 
-                       Signature, 
-                       method="ssgsea",
-                       ssgsea.norm=FALSE,
-                       kcdf="Gaussian")
+  
+  ssParam <- gsvaParam(as.matrix(Normalized_Counts_Data),
+                       Signature,
+                       kcdf = "Gaussian",
+                       maxDiff = TRUE)
+  
+  ssGSEAScores <- GSVA::gsva(ssParam, verbose=TRUE)
+  
+  # ssGSEAScores <- gsva(as.matrix(Normalized_Counts_Data), #Edited for the new version of gsva package
+  #                      Signature, 
+  #                      method="ssgsea",
+  #                      ssgsea.norm=FALSE,
+  #                      kcdf="Gaussian")
   ssGSEAScores <- as.data.frame(ssGSEAScores)
   
   ##(SKIP IF NOT SAVING ssGSEAScores.txt)
@@ -538,8 +667,8 @@ for (geneset in 1:length(GeneSets)){
   # INPUT_DF <-  ssGSEAScores
   # rownames(INPUT_DF) <- INPUT_DF[,1]
   # INPUT_DF[,1] <- NULL
-  
-  INPUT_DF <- ssGSEAScores
+
+  Input_DF <- ssGSEAScores
   rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("HALLMARK_","",as.character(x)))
   rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("REACTOME_","",as.character(x)))
   rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("BIOCARTA_","",as.character(x)))
@@ -555,25 +684,26 @@ for (geneset in 1:length(GeneSets)){
   COL_ANNOT[,"ROI"] <- NULL
   ##########################
   No_Of_Rows = 100
-  UNIT = geneset_name
+  # UNIT = geneset_name
+  UNIT = get("MSigDB_Dictionary")[geneset_name]
   #########################3
-  
-  ssGSEA_SCORES <- heatmap_func_ss(Input_DF,COL_ANNOT,100)
+
+  ssGSEA_Heatmap <- heatmap_func_ss(Input_DF,COL_ANNOT,100)
   
   #NCOLS = as.character(length(Heatmap_Data[,1]))
   #NROWS = as.character(length(Heatmap_Data[1,]))
   #######################################
   graphics.off()
-  pdf(paste(output_dir,geneset_name,"_ssGSEAScores.pdf",sep=""),width =60,height =30)
-  draw(ssGSEA_SCORES,padding = unit(c(1,5,1,1), "in"),heatmap_legend_side = "right",row_title = "", row_title_gp = gpar(col = "red"),legend_grouping = "original",
-       column_title = paste(Project_Name,"\n",UNIT,"\n",sep=""), column_title_gp = gpar(fontsize = 32))
+  pdf(paste(output_dir, "/", geneset_name,"_ssGSEAScores.pdf",sep=""),width =60,height =30)
+  draw(ssGSEA_Heatmap,padding = unit(c(1,5,1,1), "in"),heatmap_legend_side = "right",row_title = "", row_title_gp = gpar(col = "red"),legend_grouping = "original",
+       column_title = paste("ssGSEA- ", UNIT,sep=""), column_title_gp = gpar(fontsize = 32))
   graphics.off()
   #####################################
 }
 
 
 
-##↑ ↑~~~~~~~~~~~~~~~~~~~~~~
+##↑ ↑~~~~~~~~~~~~~~~~~~~~~~ ----
 
 #Do PCA plot of the geomxNorm'ed data (to see only, not intended to add data to object)
 spe_tmm <- scater::runPCA(seo_tmm)
