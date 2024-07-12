@@ -207,8 +207,8 @@ setupProject("NanostringAnalysis") ; print(paste0("Working dir is: ", getwd()))
 # output_dir <- paste0(output_dir, "/1.1_Nanostring")
 
 ## Install & Load Packages
-cran_packages <- c("DT", "ggalluvial", "ggrepel", "igraph", "magick", "tidyverse")
-bioc_packages <- c("edgeR", "GSEABase", "limma", "msigdb", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
+cran_packages <- c("colorRamp2", "DT", "ggalluvial", "ggrepel", "igraph", "magick", "RColorBrewer", "tidyverse")
+bioc_packages <- c("edgeR", "GSEABase", "limma", "msigdb", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
 install_and_load_packages(cran_packages, bioc_packages)
 
 #### Source & Process Input files ----
@@ -435,10 +435,10 @@ names(seo@colData)
 
 ####### QC Steps ---- 
 #Sample level QC
-library(ggplot2)
-library(ggalluvial)
+# library(ggplot2)
+# library(ggalluvial)
 #Visualize the data
-plotSampleInfo(seo, column2plot =c("tissue", "SlideName", "CD45", "Neuron"))
+plotSampleInfo(seo, column2plot =c("SlideName", "tissue", "CD45", "Neuron"))
 
 #### Gene level QC----
 seo #Dim 19962x175
@@ -452,6 +452,10 @@ seo_qc #Gene with low count and expression values in more than threshold (sample
 dim(seo) 
 dim(seo_qc) #Genes not meeting the above criteria were removed 19962 > 19948 
 names(seo_qc@colData)
+seo_qc@colData
+view(colData(seo_qc)[ , c("countOfLowEprGene", "percentOfLowEprGene", "ScanLabel", "lib_size", "tissue")])
+view(colData(seo_qc))
+
 length(seo@metadata$genes_rm_rawCount) #0
 length(seo_qc@metadata$genes_rm_rawCount) #175
 names(seo_qc@metadata)
@@ -464,6 +468,7 @@ metadata(seo) |>names()
 
 # plotGeneQC(seo_qc, ordannots = "regions", col = regions, point_size = 2)
 plotGeneQC(seo_qc)
+plotGeneQC(seo_qc, top_n=12, ordannots = "SlideName", col = SlideName, point_size = 2)
 plotGeneQC(seo_qc, top_n=12, ordannots = "tissue", col = tissue, point_size = 2)
 sapply(seo_qc@colData, class)
 
@@ -617,11 +622,11 @@ for(i in 1:length(ROI_ANNOTATION_COLS)){
 }
 
 ## ssGSEA Analysis
-library("RColorBrewer")
-install.packages("colorRamp2")
-library("colorRamp2")
-BiocManager::install("qusage")
-library("qusage")
+# library("RColorBrewer")
+# install.packages("colorRamp2")
+# library("colorRamp2")
+# BiocManager::install("qusage")
+# library("qusage")
 
 MSIG_DB <- paste0(input_dir, "/MSIG_DB/")
 GeneSets <- list.files(MSIG_DB, pattern= "*.gmt", full.names = F)
@@ -645,12 +650,13 @@ for (geneset in 1:length(GeneSets)){
   Signature <- qusage::read.gmt(gset_mouse)
   ####
   
-  ssParam <- gsvaParam(as.matrix(Normalized_Counts_Data),
-                       Signature,
-                       kcdf = "Gaussian",
-                       maxDiff = TRUE)
+  ssParam <- gsvaParam(as.matrix(Normalized_Counts_Data), #Matrix of gene expression
+                       Signature, #List object of gene sets
+                       kcdf = "Gaussian", #Default
+                       maxDiff = TRUE) #Default
   
   ssGSEAScores <- GSVA::gsva(ssParam, verbose=TRUE)
+  dim(ssGSEAScores)
   
   # ssGSEAScores <- gsva(as.matrix(Normalized_Counts_Data), #Edited for the new version of gsva package
   #                      Signature, 
