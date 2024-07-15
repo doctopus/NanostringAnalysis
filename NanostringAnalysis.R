@@ -207,8 +207,8 @@ setupProject("NanostringAnalysis") ; print(paste0("Working dir is: ", getwd()))
 # output_dir <- paste0(output_dir, "/1.1_Nanostring")
 
 ## Install & Load Packages
-cran_packages <- c("colorRamp2", "DT", "ggalluvial", "ggrepel", "igraph", "magick", "RColorBrewer", "tidyverse")
-bioc_packages <- c("edgeR", "GSEABase", "limma", "msigdb", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
+cran_packages <- c("circlize", "colorRamp2", "DT", "ggalluvial", "ggrepel", "grid", "igraph", "magick", "patchwork", "RColorBrewer", "tidyverse")
+bioc_packages <- c("ComplexHeatmap","edgeR", "fsgsea", "GSEABase", "GSVA", "limma", "msigdb", "msigdbr", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
 install_and_load_packages(cran_packages, bioc_packages)
 
 #### Source & Process Input files ----
@@ -327,7 +327,7 @@ final_featureAnnoFile <- bind_rows(featureAnnoFile_NegProbeWTX, featureAnnoFile_
 # 
 # is.data.frame(featureAnnoFile)
 
-#countFile----
+#### countFile----
 countFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
                         sheet="BioProbeCountMatrix") 
 countFile <- countFile %>%   dplyr::select(., c(3, 13:187)) %>% #Select the rest of sheet after the featureAnnoFile
@@ -439,7 +439,7 @@ names(seo@colData)
 # library(ggalluvial)
 #Visualize the data
 plotSampleInfo(seo, column2plot =c("SlideName", "tissue", "CD45", "Neuron"))
-
+plotSampleInfo(seo, column2plot =c("SlideName", "tissue")) + coord_flip()
 #### Gene level QC----
 seo #Dim 19962x175
 names(colData(seo)) #46 Columns in ColData
@@ -471,6 +471,7 @@ plotGeneQC(seo_qc)
 plotGeneQC(seo_qc, top_n=12, ordannots = "SlideName", col = SlideName, point_size = 2)
 plotGeneQC(seo_qc, top_n=12, ordannots = "tissue", col = tissue, point_size = 2)
 sapply(seo_qc@colData, class)
+
 
 #colData(seo)$regions
 #colnames(seo) %>% print() 
@@ -551,18 +552,37 @@ seoUMAP <- scater::runUMAP(seoPCA, dimred = "PCA")
 plotDR(seoUMAP, dimred = "UMAP", col = tissue)
 plotDR(seoUMAP, dimred = "UMAP", col = SlideName)
 
+names(seoUMAP@metadata)
 
-# ↓ ↓~~~~~~~~~~~~~~~~~~~ ----
+# ↓ ↓ Q3 Normalization and Saving Data~~~~~~~~~~~~~~~~~~~ ----
+# Input: seoUMAP; output: seoUMAP_Normalized_Q3
 Counts_Data <- as.data.frame(counts(seoUMAP))
+##(SKIP IF NOT SAVING Count Data)Generate a Gene Column for Data Saving ----
 Counts_Data <- as.data.frame(cbind(Gene=rownames(Counts_Data), Counts_Data))
+write.table(Counts_Data, paste(output_dir, "_Counts.txt", sep=""), 
+            sep="\t", row.names = F, col.names = T, quote = T)
+#Read Data
+Counts_Data <- read.delim(paste(output_dir, "_Counts.txt", sep=""), 
+                          sep="\t", header = T, check.names = F, stringsAsFactors = F)
+#Assign the rownames back as Genes
+rownames(Counts_Data) <- Counts_Data[,"Gene"]
+#Remove the Gene Column to make original counts
+Counts_Data[,"Gene"] <- NULL
+
+### Add Normalized Data to logcounts field----
 NORMALIZATION <- "upperquartile"
 
-seoUMAP_Normalized <- geomxNorm(seoUMAP, method=NORMALIZATION, log = T)
+seoUMAP_Normalized_Q3 <- geomxNorm(seoUMAP, method=NORMALIZATION, log = T)
+names(seoUMAP_Normalized_Q3@metadata) #Added "norm.method" and "norm.factor" to metadata
+seoUMAP_Normalized_Q3@metadata$norm.method
 
-Normalized_Counts_Data <- as.data.frame(logcounts(seoUMAP_Normalized))
+plotRLExpr(seoUMAP_Normalized_Q3, assay = 2, color = tissue) + ggtitle("Q3 Normalized")
+plotRLExpr(seoUMAP_Normalized_Q3, assay = 2, color = SlideName) + ggtitle("Q3 Normalized")
+
+Normalized_Counts_Data_Q3 <- as.data.frame(logcounts(seoUMAP_Normalized_Q3))
+
 ##(SKIP IF NOT SAVING Normalized Count Data)Generate a Gene Column for Data Saving ----
 Normalized_Counts_Data <- as.data.frame(cbind(Gene=rownames(Normalized_Counts_Data), Normalized_Counts_Data))
-#Write Data
 write.table(Normalized_Counts_Data, paste(output_dir, NORMALIZATION, "_Normalized_Counts.txt", sep=""), 
             sep="\t", row.names = F, col.names = T, quote = T)
 #Read Data
@@ -570,50 +590,60 @@ Normalized_Counts_Data <- read.delim(paste(output_dir, NORMALIZATION, "_Normaliz
             sep="\t", header = T, check.names = F, stringsAsFactors = F)
 #Assign the rownames back as Genes
 rownames(Normalized_Counts_Data) <- Normalized_Counts_Data[,"Gene"]
-#Remove the Gene Column
+
+#Remove the Gene Column to make original normalized counts
 Normalized_Counts_Data[,"Gene"] <- NULL
 
 ##Make Feature Data ----
-Feature_Data <- as.data.frame(rowData(seoUMAP_Normalized))
-Feature_Data <- as.data.frame(cbind(Gene=rownames(Feature_Data), Feature_Data))
+Feature_Data <- as.data.frame(rowData(seoUMAP_Normalized_Q3))
+#Skip if not saving
+# Feature_Data <- as.data.frame(cbind(Gene=rownames(Feature_Data), Feature_Data))
 
-Sample_Data <- as.data.frame(colData(seoUMAP_Normalized))
-Sample_Data <- as.data.frame(cbind(ROI=rownames(Sample_Data), Sample_Data))
+Sample_Data <- as.data.frame(colData(seoUMAP_Normalized_Q3))
+#Skip if not saving
+#Sample_Data <- as.data.frame(cbind(ROI=rownames(Sample_Data), Sample_Data))
 
 
-#↑ ↑~~~~~~~~~~~~~~~~~~
-#### Normalization########----
+#↑ ↑ Q3 Normalization End~~~~~~~~~~~~~~~~~~
+
+#### TMM Normalization########----
+# Input: seoUMAP output: seoUMAP_Normalized_TMM
 #Data has become seoUMAP now with addition of two reducedDimNames PCA and UMAP
 #names(seoUMAP@metadata)
 NORMALIZATION_METHOD <- "TMM"
-seo_tmm <- geomxNorm(seoUMAP, method = NORMALIZATION_METHOD) #TMM Normalization
+seoUMAP_Normalized_TMM <- geomxNorm(seoUMAP, method = NORMALIZATION_METHOD) #TMM Normalization
 #geomxNorm Adds two more items to metadata: norm.factor, norm.method
 
-#names(seo_tmm@metadata)
-plotRLExpr(seo_tmm, assay = 2, color = tissue) + ggtitle("TMM")
-plotRLExpr(seo_tmm, assay = 2, color = SlideName) + ggtitle("TMM")
-#↓ ↓~~~~~~~~~~~~~~~~~~~~~
-library(patchwork)
+#names(seoUMAP_Normalized_TMM@metadata)
+plotRLExpr(seoUMAP_Normalized_TMM, assay = 2, color = tissue) + ggtitle("TMM")
+plotRLExpr(seoUMAP_Normalized_TMM, assay = 2, color = SlideName) + ggtitle("TMM")
+Normalized_Counts_Data_TMM <- as.data.frame(logcounts(seoUMAP_Normalized_TMM))
+##↓↓~~~~~~~~~~~~~~~~~~~~~
+####Plot QC Figures ----
+# library(patchwork)
 
 ROI_ANNOTATION_COLS <- c("SlideName", "ScanLabel", "Neuron", "tissue", "CD45")
+dictionary <- c(TMM=seoUMAP_Normalized_TMM, Q3=seoUMAP_Normalized_Q3) #seoUMAP_Normalized_TMM (for TMM) or seoUMAP_Normalized_Q3 (for Q3)
+# eval(GRP)
 i = 1
+NORM = "Q3" #TMM or Q3 for naming the plots and files
 
 for(i in 1:length(ROI_ANNOTATION_COLS)){
-  GRP <- ROI_ANNOTATION_COLS[i]
+  GRP <- ROI_ANNOTATION_COLS[[i]]
   print(GRP)
-  
-  RLE_PLOT <- plotRLExpr(seo_tmm, assay = 2, ordannots=GRP, color=get(GRP)) + ggtitle(paste("TMM", GRP, "RLE"))
-  PCA_SCREE_PLOT <- plotScreePCA(seo_tmm, assay=2, dims=10)
-  PAIRWISE_PCA <- plotPairPCA(seo_tmm, title=GRP, col=get(GRP), shape=get(GRP), assay=2, n_dimension=3)
-  PCA_BI_PLOT <- plotPCAbiplot(seo_tmm, n_loadings=10, assay=2, col=get(GRP))
-  MultiDIM_SCALING_PLOT <- standR::plotMDS(seo_tmm, assay=2, col=get(GRP), shape=get(GRP))
-  UMAP <- plotDR(seo_tmm, dimred="UMAP", col=get(GRP))
+  set.seed(100)
+  RLE_PLOT <- plotRLExpr(dictionary[[NORM]], assay = 2, ordannots=GRP, color=get(GRP)) + ggtitle(paste(NORM, GRP, "RLE")) + labs(color=GRP)
+  PCA_SCREE_PLOT <- plotScreePCA(dictionary[[NORM]], assay=2, dims=10)
+  PAIRWISE_PCA <- plotPairPCA(dictionary[[NORM]], title=GRP, col=get(GRP), shape=get(GRP), assay=2, n_dimension=2) + labs(color=GRP, shape=GRP)
+  PCA_BI_PLOT <- plotPCAbiplot(dictionary[[NORM]], n_loadings=10, assay=2, col=get(GRP)) + labs(color=GRP)
+  MultiDIM_SCALING_PLOT <- standR::plotMDS(dictionary[[NORM]], assay=2, col=get(GRP), shape=get(GRP)) + labs(color=GRP, shape=GRP)
+  UMAP <- plotDR(dictionary[[NORM]], dimred="UMAP", col=get(GRP)) + labs(color=GRP)
   
   graphics.off() #Set up the PDF output
-  pdf(paste(output_dir,"/", NORMALIZATION_METHOD, "_NORMALIZED_", GRP, ".pdf", sep = ""), width=15, height=20)
+  pdf(paste(output_dir,"/", NORM, "_NORMALIZED_", GRP, ".pdf", sep = ""), width=15, height=20)
   combined_plot <- (
-    (RLE_PLOT / PCA_SCREE_PLOT / PAIRWISE_PCA) /
-      (PCA_BI_PLOT + MultiDIM_SCALING_PLOT + UMAP)
+    (RLE_PLOT / PAIRWISE_PCA) /
+      (PCA_BI_PLOT + MultiDIM_SCALING_PLOT + UMAP) / PCA_SCREE_PLOT
   ) +
     plot_layout(ncol = 1, guides = 'collect')
   
@@ -621,7 +651,7 @@ for(i in 1:length(ROI_ANNOTATION_COLS)){
   graphics.off() # Close the PDF device
 }
 
-## ssGSEA Analysis
+#### ssGSEA Analysis----
 # library("RColorBrewer")
 # install.packages("colorRamp2")
 # library("colorRamp2")
@@ -709,25 +739,32 @@ for (geneset in 1:length(GeneSets)){
 
 
 
-##↑ ↑~~~~~~~~~~~~~~~~~~~~~~ ----
+##↑↑~~~~~~~~~~~~~~~~~~~~~~ ----
+
+### ↓ MY Pathway specific codes start. *****************************
+
+
+
+### ↑ MY Pathway specific codes end. *****************************
 
 #Do PCA plot of the geomxNorm'ed data (to see only, not intended to add data to object)
-spe_tmm <- scater::runPCA(seo_tmm)
-pca_results_tmm <- reducedDim(spe_tmm, "PCA")
-plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = SlideName)
-plotPairPCA(spe_tmm, precomputed = pca_results_tmm, color = tissue)
+seoUMAP_Normalized_TMM <- scater::runPCA(seoUMAP_Normalized_TMM) #Adds pca data to reducedDim
+pca_results_tmm <- reducedDim(seoUMAP_Normalized_TMM, "PCA")
+plotPairPCA(seoUMAP_Normalized_TMM, precomputed = pca_results_tmm, color = SlideName)
+plotPairPCA(seoUMAP_Normalized_TMM, precomputed = pca_results_tmm, color = tissue)
 
-#### Batch Correction#########----
+#### Batch Correction########----
+#### Input: seoUMAP_Normalized_TMM/seoUMAP_Normalized_Q3 -> Output: seoNCG_TMM/seoNCG_Q3
 # Dataset used is **from before Normalization** (seoUMAP that has two reduced DimNames added)
 # One way to remove batch effect is to identify negative control genes (NCGs) among the slides
 # Find the least variable 300 genes across the slides; using findNCGs function
-spe_batch <- findNCGs(seoUMAP, 
-                      n_assay = 1, #Of two assays in seoUMAP@assays, defining 1st(counts) or 2nd (logcounts) to use
+seoNCG_TMM <- findNCGs(seoUMAP_Normalized_TMM, 
+                      n_assay = 2, #Of two assays in seoUMAP@assays, defining 1st(counts) or 2nd (logcounts) to use
                       batch_name = "SlideName", #Where batch effect expected to be observed
                       top_n = 300)
 ##findNCGs adds 'NCGs' (Negative Control Genes to metadata)
-names(spe_batch@metadata) 
-names(spe_batch@assays)
+names(seoNCG_TMM@metadata)
+names(seoNCG_TMM@assays)
 seoUMAP@colData$Neuron
 seoUMAP@colData$SlideName
 seoUMAP@colData$tissue
@@ -738,37 +775,38 @@ seoUMAP@colData$tissue
 # Optimal K value is that produces a separation of main biology of interest on the PCA plot
 # Run Paired PCA plot for k values between 1 to 5
 
-####Determine parameter to batch correct
+####Determine parameter to batch correct----
+# Input seoNCG_TMM -> seoBatch_TMM -> spe_TMM
 #To plot all pairPCAs together
 for(i in seq(5)){
-  spe_ruv <- geomxBatchCorrection(spe_batch, factors = "Neuron", #Or use other variables like tissue, Neuron, 
-                                  NCGs = metadata(spe_batch)$NCGs, k = i)
+  seoBatch_TMM <- geomxBatchCorrection(seoNCG_TMM, factors = "Neuron", #Or use other variables like tissue, Neuron, SlideName
+                                  NCGs = metadata(seoNCG_TMM)$NCGs, k = i)
   
-  print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = Neuron, title = paste0("k = ", i)))
+  print(plotPairPCA(seoBatch_TMM, assay = 2, n_dimension = 4, color = Neuron, title = paste0("k = ", i)))
   
 }
 
 #Else, print each one separately by changing k each time
-spe_ruv <- geomxBatchCorrection(spe_batch, factors = "Neuron", #factors of interest
-                                NCGs = metadata(spe_batch)$NCGs, k =2)
+seoBatch_TMM <- geomxBatchCorrection(seoNCG_TMM, factors = "Neuron", #factors of biological interest
+                                NCGs = metadata(seoNCG_TMM)$NCGs, k =2)
 ## geomxBatchCorrection adds colData 5 data points: ruv_W1 to ruv_W5
 
-print(plotPairPCA(spe_ruv, assay = 2, n_dimension = 4, color = Neuron,
+print(plotPairPCA(seoBatch_TMM, assay = 2, n_dimension = 4, color = Neuron,
                   title = paste0("k = 2 : Neuron"))) #Change k in plot for each loop manually
 
 #Identify which k has the best separation of the expected biological variation. Here we decide k=4
 
 ####Prepare batch corrected data
-#Using that k value make the spe_ruv object final, and replace the PCA data with a new PCA
-spe_ruv <- geomxBatchCorrection(spe_batch, factors = "Neuron",  #Select any factor such as tissue or Neuron
-                                NCGs = metadata(spe_batch)$NCGs, k = 2)
+#Using that k value make the seoBatch_TMM object final, and replace the PCA data with a new PCA
+seoBatch_TMM <- geomxBatchCorrection(seoNCG_TMM, factors = "Neuron",  #Select any factor of biological interest such as tissue or Neuron
+                                NCGs = metadata(seoNCG_TMM)$NCGs, k = 2)
 set.seed(100)
-spe_ruv <- scater::runPCA(spe_ruv) #update spe_ruv with new PCA data
+seoBatch_TMM <- scater::runPCA(seoBatch_TMM) #update seoBatch_TMM with new PCA data
 
-pca_results_ruv <- reducedDim(spe_ruv, "PCA") #Extract PCA data
-plotPairPCA(spe_ruv, precomputed = pca_results_ruv, color=tissue,
+pca_results_ruv <- reducedDim(seoBatch_TMM, "PCA") #Extract PCA data
+plotPairPCA(seoBatch_TMM, precomputed = pca_results_ruv, color=tissue,
             title = "RUV, k=4")
-
+spe_TMM <- seoBatch_TMM
 #Using Tissue as factor in geomBatchCorrection instead of SlideNames in the findNCGs()
 #May be alternate approach, however
 #Since SlideNames is our biology of interest, batch factor inducing variable could be tissue
@@ -790,25 +828,25 @@ plotPairPCA(spe_ruv, precomputed = pca_results_ruv, color=tissue,
 #Normalized counts should not be used in linear modelling, rather the weight matrix
 #...generated from geomBatchCorrection should be used as covariates
 #Weight matrix can be found as following **from Batch Corrected Data**
-colData(spe_ruv)[,seq(ncol(colData(spe_ruv))-1, ncol(colData(spe_ruv)))] |>head()
+colData(spe_TMM)[,seq(ncol(colData(spe_TMM))-1, ncol(colData(spe_TMM)))] |>head()
 #↑This will have as many W columns as defined in the geomBatchCorrection step
 
-#spe_ruv@colData
-temp <-  spe_ruv@colData
-spe_ruv@colData$temp
+#spe_TMM@colData
+temp <-  spe_TMM@colData
+spe_TMM@colData$temp
 
 #Establishing design matrix and contrast
 #Derive DGElist object from SpatialExperiment Object using SE2DGEList function of edgeR
 
-dge <- SE2DGEList(spe_ruv)
+dge <- SE2DGEList(spe_TMM)
 #Check columns and rows of ColData and metadata in the SpatialExperiement Object
-colnames(colData(spe_ruv))
-names(metadata(spe_ruv))
+colnames(colData(spe_TMM))
+names(metadata(spe_TMM))
 
 
-##### 1 BEGIN: Workflow Beginning for Each New Set of Design Compare----
+##### 1 EdgeR : Workflow Beginning for Each New Set of Design Compare----
 #Adding W matrices resulting from RUV4 to the model matrix as covariates to use the batch corrected data
-design <- model.matrix(~0 + Neuron + ruv_W1 + ruv_W2, data = colData(spe_ruv)) #Select Any factor for comparison like tissue, Neuron
+design <- model.matrix(~0 + Neuron + ruv_W1 + ruv_W2, data = colData(spe_TMM)) #Select Any factor for comparison like tissue, Neuron, or SlideName
 colnames(design)
 #Rename by removing the tissue prefix
 # colnames(design) <- gsub("^tissue", "", colnames(design))
@@ -859,7 +897,7 @@ bcv_df <- data.frame(
  points(highbcv_df$AveLogCPM, highbcv_df$BCV, col = "red")
  text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4)
 
-#### Differential Expression ----
+#### 2 Differential Expression LIMMA VOOM ----
 #In the limma-voom pipeline, linear modelling is carried out on the log-CPM values by using 
 # ...the voom, lmFit, contrasts.fit and eBayes functions.
 v <- voom(dge_all, design, plot = TRUE) #Variance Trend
@@ -872,7 +910,7 @@ results_efit <- decideTests(efit, p.value = 0.05)
 summary_efit <- summary(results_efit)
 summary_efit #Shows that between the HvN contast group, how many genes are up and downregulated
 
-#### Visualization
+#### Volcano Visualization
 # library(ggrepel)
 # library(tidyverse)
 de_results_HvN <- topTable(efit, coef = 1, sort.by = "P", n = Inf)
@@ -895,116 +933,116 @@ de_results_HvN %>%
   scale_color_manual(values = c("blue", "grey", "red")) +
   theme(text = element_text(size=15),
         plot.title = element_text(hjust = 0.5))
-
-#### Second set of comparison Between SlideNames ---
-
-
-
-##### 2 BEGIN: SlideName: Workflow Beginning for Each New Set of Design Compare----
-#Adding W matrices resulting from RUV4 to the model matrix as covariates to use the batch corrected data
-design <- model.matrix(~0 + SlideName + ruv_W1 + ruv_W2, data = colData(spe_ruv)) #Select Any factor for comparison like tissue, Neuron
-colnames(design)
-#Rename by removing the tissue prefix
-colnames(design) <- gsub("^SlideName", "", colnames(design))
-# colnames(design) <- gsub("-H\\+", "H_POS", colnames(design))
-# colnames(design) <- gsub("-H\\-", "H_NEG", colnames(design))
-
-#Create alternative Design file for DESeq2
-design_mods <- as.data.frame(design) %>%
-  rownames_to_column("RowName") %>%        #Convert row names to a column
-  mutate(Sample = gsub(" \\|.*", "", RowName)) %>%  #Extract the part before the first pipe
-  pivot_longer(cols = tumor:tumor_gland, names_to = "Tissue", values_to = "Value") %>%
-  filter(Value == 1) %>%
-  select(-Value) %>%
-  arrange(RowName) %>%
-  column_to_rownames("RowName") #Convert back to row names
-
-####For Within one group comparisons start here.
-#The comparison matrix is setup using makeContrasts function from Limma
-#To compare Tumor with Tumor Edge
-factor1 = "BBP"
-factor2= "FP"
-
-title <- paste(factor1, "vs", factor2)  
-# # resultsNames(dds)
-# e <- as.formula(paste0(factor1, "-", factor2))
-
-
-contr.matrix2 <- makeContrasts(
-  BBPvsFP = BBP - FP,
-  levels = colnames(design))
-
-#Filter out the number of genes with low coverage for accurate mean variance relationship
-#..using filterByExpr function of egdeR package
-keep <- filterByExpr(dge, design)
-table(keep) #Shows 893 genes are excluded, from the total 19948 genes (Same for the same column)
-
-rownames(dge)[!keep] #remove any gene with low expression
-dge_all <- dge[keep, ]
-names(dge_all) #Had 3 cols: "counts"  "samples" "genes" 
-###QC: Biological CV (BCV) is the coefficient of variation with which the (unknown) true abundance
-#...of the gene varies between replicate RNA samples.
-#BCV Check
-dge_all <- estimateDisp(dge_all, design = design, robust = TRUE)
-names(dge_all) # added 9 cols like "design", "common.dispersion", "trended.dispersion", "tagwise.dispersion", "AveLogCPM", "trend.method", "prior.df", "prior.n", "span"
-
-plotBCV(dge_all, legend.position = "topleft", ylim = c(0, 1.3), main = title)
-
-bcv_df <- data.frame(
-  'BCV' = sqrt(dge_all$tagwise.dispersion),
-  'AveLogCPM' = dge_all$AveLogCPM,
-  'gene_id' = rownames(dge_all)
-)
-highbcv <- bcv_df$BCV >0.8
-highbcv_df <- bcv_df[highbcv, ]
-points(highbcv_df$AveLogCPM, highbcv_df$BCV, col = "red")
-text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4)
-
-#### Differential Expression ----
-#In the limma-voom pipeline, linear modelling is carried out on the log-CPM values by using 
-# ...the voom, lmFit, contrasts.fit and eBayes functions.
-v <- voom(dge_all, design, plot = TRUE) #Variance Trend
-
-fit <- lmFit(v)
-fit_contrast <- contrasts.fit(fit, contrasts = contr.matrix2) #Change Contr.Matrix for each Comparison
-efit <- eBayes(fit_contrast, robust = TRUE)
-
-results_efit <- decideTests(efit, p.value = 0.05)
-summary_efit <- summary(results_efit)
-summary_efit #Shows that between the HvN contast group, how many genes are up and downregulated
-
-#### Visualization
-# library(ggrepel)
-# library(tidyverse)
-de_results_HvN <- topTable(efit, coef = 1, sort.by = "P", n = Inf)
-
-de_genes_toptable_HvN <- topTable(efit, coef = 1, sort.by = "P", n = Inf, p.value = 0.05)
-
-de_results_HvN %>% 
-  mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
-                     ifelse(logFC<0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
-  ggplot(aes(AveExpr, logFC, col = DE)) +
-  geom_point(shape = 1, size = 1) +
-  geom_text_repel(data = de_genes_toptable_HvN %>% 
-                    mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
-                                       ifelse(logFC < 0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
-                    rownames_to_column(), aes(label = rowname)) +
-  theme_bw() +
-  xlab("Average log-expression") +
-  ylab("Log-fold-change") +
-  ggtitle(title) + #Change for Each Comparison
-  scale_color_manual(values = c("blue", "grey", "red")) +
-  theme(text = element_text(size=15),
-        plot.title = element_text(hjust = 0.5))
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~----
+#### DUPLICATE Second set of comparison Between SlideNames COMMENTED> MAKE FUNCTION ----
 
 
 
+# ##### 2 DUPLICATE SET from Above: BEGIN: SlideName: Workflow Beginning for Each New Set of Design Compare--
+# #Adding W matrices resulting from RUV4 to the model matrix as covariates to use the batch corrected data
+# design <- model.matrix(~0 + SlideName + ruv_W1 + ruv_W2, data = colData(spe_TMM)) #Select Any factor for comparison like tissue, Neuron
+# colnames(design)
+# #Rename by removing the tissue prefix
+# colnames(design) <- gsub("^SlideName", "", colnames(design))
+# # colnames(design) <- gsub("-H\\+", "H_POS", colnames(design))
+# # colnames(design) <- gsub("-H\\-", "H_NEG", colnames(design))
+# 
+# #Create alternative Design file for DESeq2
+# design_mods <- as.data.frame(design) %>%
+#   rownames_to_column("RowName") %>%        #Convert row names to a column
+#   mutate(Sample = gsub(" \\|.*", "", RowName)) %>%  #Extract the part before the first pipe
+#   pivot_longer(cols = tumor:tumor_gland, names_to = "Tissue", values_to = "Value") %>%
+#   filter(Value == 1) %>%
+#   select(-Value) %>%
+#   arrange(RowName) %>%
+#   column_to_rownames("RowName") #Convert back to row names
+# 
+# ####For Within one group comparisons start here.
+# #The comparison matrix is setup using makeContrasts function from Limma
+# #To compare Tumor with Tumor Edge
+# factor1 = "BBP"
+# factor2= "FP"
+# 
+# title <- paste(factor1, "vs", factor2)  
+# # # resultsNames(dds)
+# # e <- as.formula(paste0(factor1, "-", factor2))
+# 
+# 
+# contr.matrix2 <- makeContrasts(
+#   BBPvsFP = BBP - FP,
+#   levels = colnames(design))
+# 
+# #Filter out the number of genes with low coverage for accurate mean variance relationship
+# #..using filterByExpr function of egdeR package
+# keep <- filterByExpr(dge, design)
+# table(keep) #Shows 893 genes are excluded, from the total 19948 genes (Same for the same column)
+# 
+# rownames(dge)[!keep] #remove any gene with low expression
+# dge_all <- dge[keep, ]
+# names(dge_all) #Had 3 cols: "counts"  "samples" "genes" 
+# ###QC: Biological CV (BCV) is the coefficient of variation with which the (unknown) true abundance
+# #...of the gene varies between replicate RNA samples.
+# #BCV Check
+# dge_all <- estimateDisp(dge_all, design = design, robust = TRUE)
+# names(dge_all) # added 9 cols like "design", "common.dispersion", "trended.dispersion", "tagwise.dispersion", "AveLogCPM", "trend.method", "prior.df", "prior.n", "span"
+# 
+# plotBCV(dge_all, legend.position = "topleft", ylim = c(0, 1.3), main = title)
+# 
+# bcv_df <- data.frame(
+#   'BCV' = sqrt(dge_all$tagwise.dispersion),
+#   'AveLogCPM' = dge_all$AveLogCPM,
+#   'gene_id' = rownames(dge_all)
+# )
+# highbcv <- bcv_df$BCV >0.8
+# highbcv_df <- bcv_df[highbcv, ]
+# points(highbcv_df$AveLogCPM, highbcv_df$BCV, col = "red")
+# text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4)
+# 
+#### Differential Expression LIMMA VOOM----
+# #In the limma-voom pipeline, linear modelling is carried out on the log-CPM values by using 
+# # ...the voom, lmFit, contrasts.fit and eBayes functions.
+# v <- voom(dge_all, design, plot = TRUE) #Variance Trend
+# 
+# fit <- lmFit(v)
+# fit_contrast <- contrasts.fit(fit, contrasts = contr.matrix2) #Change Contr.Matrix for each Comparison
+# efit <- eBayes(fit_contrast, robust = TRUE)
+# 
+# results_efit <- decideTests(efit, p.value = 0.05)
+# summary_efit <- summary(results_efit)
+# summary_efit #Shows that between the HvN contast group, how many genes are up and downregulated
 
-############Gene Set Enrichment Analysis----
+# #### Volcano Visualization
+# # library(ggrepel)
+# # library(tidyverse)
+# de_results_HvN <- topTable(efit, coef = 1, sort.by = "P", n = Inf)
+# 
+# de_genes_toptable_HvN <- topTable(efit, coef = 1, sort.by = "P", n = Inf, p.value = 0.05)
+# 
+# de_results_HvN %>% 
+#   mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
+#                      ifelse(logFC<0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
+#   ggplot(aes(AveExpr, logFC, col = DE)) +
+#   geom_point(shape = 1, size = 1) +
+#   geom_text_repel(data = de_genes_toptable_HvN %>% 
+#                     mutate(DE = ifelse(logFC > 0 & adj.P.Val <0.05, "UP",
+#                                        ifelse(logFC < 0 & adj.P.Val<0.05, "DOWN", "NOT DE"))) %>% 
+#                     rownames_to_column(), aes(label = rowname)) +
+#   theme_bw() +
+#   xlab("Average log-expression") +
+#   ylab("Log-fold-change") +
+#   ggtitle(title) + #Change for Each Comparison
+#   scale_color_manual(values = c("blue", "grey", "red")) +
+#   theme(text = element_text(size=15),
+#         plot.title = element_text(hjust = 0.5))
+
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~----
+############Gene Set Enrichment Analysis LIMMA----
 #Using fry from limma package
 #Load Gene sets
-library(msigdb)
-library(GSEABase)
+# library(msigdb)
+# library(GSEABase)
 msigdb_hs <- getMsigdb(version ='7.2')
 
 msigdb_hs <- appendKEGG(msigdb_hs)
@@ -1079,16 +1117,16 @@ cran_packages <- c("annotate", "circlize", "devtools", "EnhancedVolcano", "ggpub
 bioc_packages <- c("apeglm", "clusterProfiler", "ComplexHeatmap", "DESeq2", "DOSE", "enrichplot", "genefilter", "GSVA", "org.Hs.eg.db", "org.Mm.eg.db", "pathview", "xCell")
 install_and_load_packages(cran_packages, bioc_packages)
 
-# Input SpatialExperiment Object: spe_ruv
-fc <- assays(spe_ruv, 1, withDimnames = FALSE)$counts
-fc <- assays(spe_ruv, 2, withDimnames =TRUE, stringsAsFactors=FALSE)$counts
-sapply(assay(spe_ruv, 2, withDimnames =TRUE)$counts, class)
+# Input SpatialExperiment Object: spe_TMM
+fc <- assays(spe_TMM, 1, withDimnames = FALSE)$counts
+fc <- assays(spe_TMM, 2, withDimnames =TRUE, stringsAsFactors=FALSE)$counts
+sapply(assay(spe_TMM, 2, withDimnames =TRUE)$counts, class)
 sapply(countsData, class)
 
-countData <- as.data.frame(counts(spe_ruv))
+countData <- as.data.frame(counts(spe_TMM))
 str(countData)
 
-colData <- as.data.frame(spe_ruv@colData@listData)
+colData <- as.data.frame(spe_TMM@colData@listData)
 colData <- colData %>% dplyr::select(c("SlideName", "Neuron", "tissue", "CD45"))
 
 colData <- colData %>% mutate(tissue = str_to_sentence(tissue))
@@ -1108,7 +1146,7 @@ str(colData)
 ddsObject <- DESeqDataSetFromMatrix(countData = countData,
                                     colData = colData,
                                     design = ~ CD45)
-# ddsObject <- DESeqDataSet(spe_ruv, design = ~ CD45)
+# ddsObject <- DESeqDataSet(spe_TMM, design = ~ CD45)
 
 #Keeping rows that have at least 10 reads for a minimum number of samples
 #Minimal number of samples is the smallest group size, eg here 12 of each cellLine
@@ -1118,8 +1156,8 @@ ddsObject <- DESeqDataSetFromMatrix(countData = countData,
 # } else {
 #   smallestGroupSize <- 12
 # }
-## Make the previously made spe_ruv as the dds object
-ddsObject <- spe_ruv
+## Make the previously made spe_TMM as the dds object
+ddsObject <- spe_TMM
 smallestGroupSize <- 25 #Approx in one group BBP, Sympa etc
 #counts(ddsObject)
 #keep <-  rowSums(counts(dds2))>= 10
@@ -1142,9 +1180,9 @@ ddsObject_filtered$SlideName <- droplevels(ddsObject_filtered$SlideName) #remove
 ##### Run DESeq2 Analysis ----
 dds <- DESeq(ddsObject_filtered)
 
-sapply(spe_ruv@assays@data$counts, class)
-spe_ruv@assays@data$counts <- as.numeric(unlist(spe_ruv@assays@data$counts))
-dds <- DESeqDataSet(spe_ruv)
+sapply(spe_TMM@assays@data$counts, class)
+spe_TMM@assays@data$counts <- as.numeric(unlist(spe_TMM@assays@data$counts))
+dds <- DESeqDataSet(spe_TMM)
 ##### DDS Apply Transformation ----
 # Apply transformation & estimate dispersion trend
 # vsd <- vst(dds, blind = FALSE) # VST: Variance Stabilizing Transformation
