@@ -619,7 +619,7 @@ plotRLExpr(seoUMAP_Normalized_TMM, assay = 2, color = tissue) + ggtitle("TMM")
 plotRLExpr(seoUMAP_Normalized_TMM, assay = 2, color = SlideName) + ggtitle("TMM")
 Normalized_Counts_Data_TMM <- as.data.frame(logcounts(seoUMAP_Normalized_TMM))
 ##↓↓~~~~~~~~~~~~~~~~~~~~~
-####Plot QC Figures ----
+#### Plot QC Figures ----
 # library(patchwork)
 
 ROI_ANNOTATION_COLS <- c("SlideName", "ScanLabel", "Neuron", "tissue", "CD45")
@@ -741,13 +741,8 @@ for (geneset in 1:length(GeneSets)){
 
 ##↑↑~~~~~~~~~~~~~~~~~~~~~~ ----
 
-### ↓ MY Pathway specific codes start. *****************************
 
-
-
-### ↑ MY Pathway specific codes end. *****************************
-
-#Do PCA plot of the geomxNorm'ed data (to see only, not intended to add data to object)
+#Do PCA plot of the geomxNorm'ed data (to update PCA data to object)
 seoUMAP_Normalized_TMM <- scater::runPCA(seoUMAP_Normalized_TMM) #Adds pca data to reducedDim
 pca_results_tmm <- reducedDim(seoUMAP_Normalized_TMM, "PCA")
 plotPairPCA(seoUMAP_Normalized_TMM, precomputed = pca_results_tmm, color = SlideName)
@@ -835,6 +830,7 @@ colData(spe_TMM)[,seq(ncol(colData(spe_TMM))-1, ncol(colData(spe_TMM)))] |>head(
 temp <-  spe_TMM@colData
 spe_TMM@colData$temp
 
+##### 1 EdgeR : Workflow Beginning for Each New Set of Design Compare----
 #Establishing design matrix and contrast
 #Derive DGElist object from SpatialExperiment Object using SE2DGEList function of edgeR
 
@@ -843,8 +839,6 @@ dge <- SE2DGEList(spe_TMM)
 colnames(colData(spe_TMM))
 names(metadata(spe_TMM))
 
-
-##### 1 EdgeR : Workflow Beginning for Each New Set of Design Compare----
 #Adding W matrices resulting from RUV4 to the model matrix as covariates to use the batch corrected data
 design <- model.matrix(~0 + Neuron + ruv_W1 + ruv_W2, data = colData(spe_TMM)) #Select Any factor for comparison like tissue, Neuron, or SlideName
 colnames(design)
