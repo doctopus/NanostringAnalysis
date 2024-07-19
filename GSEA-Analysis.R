@@ -3,7 +3,7 @@
 #Pathways to focus on could be filtered from specific genesets such as Hallmark, Reactome, Biocarta etc
 #Input: Normalized Count Data & Sample Data
 #Output: Heatmap Plots
-#
+#May SKIP Setting Up Environment if Done already-----
 install_and_load_packages <- function(cran_packages, bioc_packages) {
   # Install missing CRAN packages
   new_packages_cran <- cran_packages[!(cran_packages %in% installed.packages()[, "Package"])]
@@ -22,10 +22,10 @@ install_and_load_packages <- function(cran_packages, bioc_packages) {
 cran_packages <- c("circlize", "colorRamp2", "DT", "ggalluvial", "ggrepel", "grid", "igraph", "magick", "patchwork", "RColorBrewer", "tidyverse")
 bioc_packages <- c("ComplexHeatmap","edgeR", "fsgsea", "GSEABase", "GSVA", "limma", "msigdb", "msigdbr", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
 install_and_load_packages(cran_packages, bioc_packages)
-
+#### Non-Function Way of Getting Pathway specific genes from MSIGDB----
 M <- msigdbr(species = "Mus musculus", category = "C2", subcategory = "CP")
 
-# Retrieve mouse gene sets
+#### Retrieve mouse gene sets
 msigdb_mouse = msigdbr(species = "Mus musculus") #3783805
 #Unique number of genes
 print(length(unique(msigdb_mouse$gene_symbol))) #17961
@@ -54,7 +54,55 @@ reactome_wnt_genes_mouse = wnt_genesets_mouse %>%
 
 cat("Number of genes in REACTOME_SIGNALING_BY_WNT:", length(reactome_wnt_genes_mouse), "\n") #316
 
+#### Useful Functions ----
 
+## To Find genes of a particular pathway from its name
+find_genes_for_specific_pathway <- function(pathway_name, species = "Mus musculus") {
+  # Get all gene sets for the species
+  all_gene_sets <- msigdbr(species = species)
+  
+  # Filter for the specific pathway
+  pathway_genes <- all_gene_sets %>%
+    filter(gs_name == pathway_name) %>%
+    pull(gene_symbol) %>%
+    unique()
+  
+  return(pathway_genes)
+}
+# Example usage:
+pathway_of_interest <- "REACTOME_WNT_LIGAND_BIOGENESIS_AND_TRAFFICKING"
+species <- "Mus musculus"
+genes_in_pathway <- find_genes_for_specific_pathway(pathway_of_interest, species)
+print(paste("Number of genes in", pathway_of_interest, ":", length(genes_in_pathway)))
+print("Genes:")
+print(genes_in_pathway)
+
+
+## To check which collection the particular pathway belongs to as well; it gives both the genes and the collection, eg C2 that the pathway belongs to.
+find_genes_and_collection_for_specific_pathway <- function(pathway_name, species = "Mus musculus") {
+  # Get all gene sets for the species
+  all_gene_sets <- msigdbr(species = species)
+  # Filter for the specific pathway
+  pathway_info <- all_gene_sets %>%
+    filter(gs_name == pathway_name)
+  
+  if(nrow(pathway_info) == 0) {
+    return(list(genes = character(0), collection = NA))
+  }
+  
+  genes <- unique(pathway_info$gene_symbol)
+  collection <- unique(pathway_info$gs_cat)
+  return(list(genes = genes, collection = collection))
+}
+# Example usage:
+pathway_of_interest <- "REACTOME_WNT_LIGAND_BIOGENESIS_AND_TRAFFICKING"
+species <- "Mus musculus"
+result <- find_genes_and_collection_for_specific_pathway(pathway_of_interest, species)
+print(paste("Pathway:", pathway_of_interest))
+print(paste("Collection:", result$collection))
+print(paste("Number of genes:", length(result$genes)))
+print("Genes:")
+print(result$genes)
 
 
 
@@ -109,7 +157,7 @@ analyze_pathway <- function(expr_data, sample_data, species, pathway, collection
 }
 
 
-# Load data----
+## Load data----
 Normalized_Counts_Data <- Normalized_Counts_Data_Q3 #Or Normalized_Counts_Data_TMM
 Sample_Data <- Sample_Data %>% mutate(SlideName = gsub("BBP", "BFP", SlideName))
 # Ensure that the column names of Normalized_Counts_Data match the row names of Sample_Data
@@ -257,61 +305,6 @@ for (pathway in pathways) {
 
 
 
-## To Find genes of a particular pathway from its name
-find_genes_for_specific_pathway <- function(pathway_name, species = "Homo sapiens") {
-  # Get all gene sets for the species
-  all_gene_sets <- msigdbr(species = species)
-  
-  # Filter for the specific pathway
-  pathway_genes <- all_gene_sets %>%
-    filter(gs_name == pathway_name) %>%
-    pull(gene_symbol) %>%
-    unique()
-  
-  return(pathway_genes)
-}
-
-# Example usage:
-pathway_of_interest <- "BIOCARTA_WNT_LRP6_PATHWAY"
-species <- "Homo sapiens"  # or "Mus musculus" if you're working with mouse data
-
-genes_in_pathway <- find_genes_for_specific_pathway(pathway_of_interest, species)
-
-print(paste("Number of genes in", pathway_of_interest, ":", length(genes_in_pathway)))
-print("Genes:")
-print(genes_in_pathway)
-
-
-## To check which collection the particular pathway belongs to as well; it gives both the genes and the collection, eg C2 that the pathway belongs to.
-find_genes_and_collection_for_specific_pathway <- function(pathway_name, species = "Homo sapiens") {
-  # Get all gene sets for the species
-  all_gene_sets <- msigdbr(species = species)
-  
-  # Filter for the specific pathway
-  pathway_info <- all_gene_sets %>%
-    filter(gs_name == pathway_name)
-  
-  if(nrow(pathway_info) == 0) {
-    return(list(genes = character(0), collection = NA))
-  }
-  
-  genes <- unique(pathway_info$gene_symbol)
-  collection <- unique(pathway_info$gs_cat)
-  
-  return(list(genes = genes, collection = collection))
-}
-
-# Example usage:
-pathway_of_interest <- "BIOCARTA_WNT_LRP6_PATHWAY"
-species <- "Homo sapiens"
-
-result <- find_genes_and_collection_for_specific_pathway(pathway_of_interest, species)
-
-print(paste("Pathway:", pathway_of_interest))
-print(paste("Collection:", result$collection))
-print(paste("Number of genes:", length(result$genes)))
-print("Genes:")
-print(result$genes)
 
 
 ## Volcano Plot of GeneSets ----
@@ -339,7 +332,7 @@ write.table(MouseHallmarkEnrichment_Results,paste(DOWNSTREAM_ANALYSIS_DIR,"GSEA_
 
 
 
-#### Normalization Definitions -----
+#### Delete: Normalization Definitions -----
 
 Q3 (Upper Quartile) Normalization:
   
