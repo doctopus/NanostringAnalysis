@@ -3,6 +3,8 @@
 #Pathways to focus on could be filtered from specific genesets such as Hallmark, Reactome, Biocarta etc
 #Input: Normalized Count Data & Sample Data
 #Output: Heatmap Plots
+library(msigdbr)
+
 #May SKIP Setting Up Environment if Done already-----
 install_and_load_packages <- function(cran_packages, bioc_packages) {
   # Install missing CRAN packages
@@ -25,7 +27,19 @@ install_and_load_packages(cran_packages, bioc_packages)
 #### Non-Function Way of Getting Pathway specific genes from MSIGDB----
 M <- msigdbr(species = "Mus musculus", category = "C2", subcategory = "CP")
 
-#### Retrieve mouse gene sets
+
+####. Finding Genes of a category of. pathway from msigdb ---- 
+Human_Hallmark <- msigdbr(species="Homo sapiens", 
+                                                         category ="H")
+MTORC1_Signaling_Pathway_Genes <- Human_Hallmark %>% dplyr::filter(gs_name =="HALLMARK_MTORC1_SIGNALING") %>% 
+  dplyr::select(c("gs_name", "gene_symbol", "gs_description"))
+# install.packages("clipr")
+# library(clipr)
+# Export the data frame to clipboard
+write_clip(MTORC1_Signaling_Pathway_Genes)
+
+
+#### Retrieve mouse gene sets ----
 msigdb_mouse = msigdbr(species = "Mus musculus") #3783805
 #Unique number of genes
 print(length(unique(msigdb_mouse$gene_symbol))) #17961
@@ -38,7 +52,8 @@ wnt_genesets_mouse = msigdb_mouse %>%
 
 # Extract unique genes associated with Wnt signaling
 wnt_genes_mouse = unique(wnt_genesets_mouse$gene_symbol)
-
+#Check if a particular gene of interest is in the list
+"Dkk4" %in% wnt_genes_mouse
 # Print the number of Wnt-related gene sets and genes
 cat("Number of Wnt-related gene sets:", nrow(wnt_genesets_mouse), "\n") #8058
 cat("Number of unique Wnt-related genes:", length(wnt_genes_mouse), "\n") #3724

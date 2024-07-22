@@ -4,7 +4,7 @@
 #Vignette partial upto data preparation: standR package: https://davislaboratory.github.io/standR/articles/standR_introduction.html
 #===
 
-##### Define Functions########################
+######## Define Functions########################
 setupProject <- function(project) {
   #Create 'project' dir if not same as name of *.Rproj dir as root/proj/io, else
   #..set root as proj dir, create io as root/io; set input_dir & output_dir vars
@@ -219,10 +219,10 @@ install_and_load_packages(cran_packages, bioc_packages)
 # countFile & featureAnnoFile from BioProbeCountMatrix sheet
 #### sampleAnnoFile----
 #SegmentProperties Worksheet: SegmentDisplayName is default column
-sampleAnnoFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
+pre_sampleAnnoFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
                                      sheet="SegmentProperties")
 
-final_sampleAnnoFile <- sampleAnnoFile %>% 
+sampleAnnoFile <- pre_sampleAnnoFile %>% 
   mutate(SlideName = gsub(" breast", "", #Format texts; remove extra words and signs
                           gsub(" 1/2-", "", SlideName)),
          ScanLabel = gsub(" 1/2-", "", ScanLabel),
@@ -236,15 +236,15 @@ final_sampleAnnoFile <- sampleAnnoFile %>%
  
 #### featureAnnoFile----
 #BioProbeCountMatrix Worksheet: TargetName is default column
-featureAnnoFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
+pre_featureAnnoFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
                                       sheet = "BioProbeCountMatrix")
 
-featureAnnoFile <- dplyr::select(featureAnnoFile, 1:12) %>% #Get the featureData relevant columns only
+next_featureAnnoFile <- dplyr::select(pre_featureAnnoFile, 1:12) %>% #Get the featureData relevant columns only
   dplyr::select(TargetName, everything())
 
 #Process the duplicates where the Targetname is not NegProbe-WTX and then combine them back
-# Isolate rows with "NegProbe-WTX" in TargetName
-featureAnnoFile_NegProbeWTX <- featureAnnoFile %>%
+#Isolate rows with "NegProbe-WTX" in TargetName
+featureAnnoFile_NegProbeWTX <- next_featureAnnoFile %>%
   filter(TargetName == "NegProbe-WTX")
 
 # Process other rows to remove duplicates based on "TargetName" and concatenate unique values for duplicates
@@ -268,7 +268,7 @@ featureAnnoFile_NegProbeWTX <- featureAnnoFile %>%
 #ensuring .fns works with character vectors properly.
 #Added rowwise() before the mutate step to ensure that mutate works row-wise
 #Used indexing [1] instead of first to avoid issues with the first method for numeric vectors.
-featureAnnoFile_others <- featureAnnoFile %>%
+featureAnnoFile_others <- next_featureAnnoFile %>%
   filter(TargetName != "NegProbe-WTX") %>% # Remaining rows with genes in TargetName
   mutate(GeneID = as.character(GeneID)) %>% # Convert GeneID num -> character
   group_by(TargetName) %>% # Concatenate unique values of duplicate TargetNames
@@ -282,16 +282,16 @@ featureAnnoFile_others <- featureAnnoFile %>%
     }
   ), .groups = "drop") %>%
   rowwise() %>%
-  mutate(GeneID = featureAnnoFile$GeneID[match(TargetName, featureAnnoFile$TargetName)][1])
+  mutate(GeneID = next_featureAnnoFile$GeneID[match(TargetName, next_featureAnnoFile$TargetName)][1])
 
 
 # Combine both processed datasets
-final_featureAnnoFile <- bind_rows(featureAnnoFile_NegProbeWTX, featureAnnoFile_others) %>% 
+featureAnnoFile <- bind_rows(featureAnnoFile_NegProbeWTX, featureAnnoFile_others) %>% 
   as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
 
-#As TargetName (Which is the default Defined column of Nanostring Data) whihc holds gene Name and also multiple NegProbe-WTX 
-#is not retained, so create anther column to retain it.
-final_featureAnnoFile[,"TargetGene"] <- final_featureAnnoFile[,"TargetName"]
+#As TargetName (Which is the default Defined column of Nanostring Data) which holds gene Name and also multiple NegProbe-WTX 
+#is not retained, so create anther column to retain it for DEG analysis.
+featureAnnoFile[,"TargetGene"] <- featureAnnoFile[,"TargetName"]
 
 
 # Previous attempts
@@ -313,16 +313,6 @@ final_featureAnnoFile[,"TargetGene"] <- final_featureAnnoFile[,"TargetName"]
 #   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
 #==
-# duplicated_values <- unique(featureAnnoFile$TargetName[duplicated(featureAnnoFile$TargetName)])
-
-# column_names <- colnames(featureAnnoFile)
-# 
-# # Check if "TargetName" is in the column names
-# if ("TargetName" %in% column_names) {
-#   print("Column 'TargetName' exists in the dataset.")
-# } else {
-#   print("Column 'TargetName' does not exist in the dataset.")
-# }
 
 # featureAnnoFile <- featureAnnoFile %>% #filter(!(TargetName %in% c('D830030K20Rik', 'Gm10406', 'LOC118568634'))) %>% 
 #   # filter(TargetName != "NegProbe-WTX") %>%
@@ -335,24 +325,24 @@ final_featureAnnoFile[,"TargetGene"] <- final_featureAnnoFile[,"TargetName"]
 # is.data.frame(featureAnnoFile)
 
 #### countFile----
-countFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
+pre_countFile <- readxl::read_excel("input/Initial Dataset 5-9-23.xlsx", 
                         sheet="BioProbeCountMatrix") 
-countFile <- countFile %>%   dplyr::select(., c(3, 13:187)) %>% #Select the rest of sheet after the featureAnnoFile
+next_countFile <- pre_countFile %>%   dplyr::select(., c(3, 13:187)) %>% #Select the rest of sheet after the featureAnnoFile
   # filter(TargetName !=duplicates) %>%
   setNames(c(gsub(" 1/2-", "", colnames(.)))) %>% 
   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
 #Process the duplicates where the Targetname is not NegProbe-WTX and then combine them back
 #countFile_NegProbeWTX <- countFile[which(countFile[,"TargetName"]=="NegProbe-WTX"),]
-countFile_NegProbeWTX <- countFile %>% filter(TargetName == "NegProbe-WTX")
+countFile_NegProbeWTX <- next_countFile %>% filter(TargetName == "NegProbe-WTX")
 
-countFile_others <- countFile %>%
+countFile_others <- next_countFile %>%
   filter(TargetName != "NegProbe-WTX") %>%
   # mutate_at(c("GeneID"), as.character) %>% 
   group_by(TargetName) %>%
   summarise(across(everything(), ~ sum(., na.rm = TRUE)), .groups = "drop")
 # Combine
-final_countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>% 
+countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>% 
   as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
 
 
@@ -363,9 +353,9 @@ final_countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>%
 #install.packages("ggalluvial") #required for the standR package
 #install.packages("magick") #required for the standR package
 
-seo <- readGeoMx(countFile = final_countFile,
-                  sampleAnnoFile = final_sampleAnnoFile,
-                  featureAnnoFile = final_featureAnnoFile)
+seo <- readGeoMx(countFile = countFile,
+                  sampleAnnoFile = sampleAnnoFile,
+                  featureAnnoFile = featureAnnoFile)
 
 # seo_df <- readGeoMx(countFile = "output/countFile.txt",
                  # sampleAnnoFile = "output/sampleAnnoFile.txt",
@@ -447,14 +437,14 @@ names(seo@colData)
 # library(ggplot2)
 # library(ggalluvial)
 #Visualize the data
-plotSampleInfo(seo, column2plot =c("SlideName", "tissue", "CD45", "Neuron"))
+plotSampleInfo(seo, column2plot =c("SlideName", "tissue", "Neuron", "CD45"))
 plotSampleInfo(seo, column2plot =c("SlideName", "tissue")) + coord_flip()
 #### Gene level QC [seo_qc]----
 seo #Dim 19962x175
 names(colData(seo)) #46 Columns in ColData
 seo_qc <- addPerROIQC(seo, 
-                      rm_genes =TRUE,
                       sample_fraction = 0.9, #Default
+                      rm_genes =TRUE, #Default
                       min_count = 5) #Default
 seo_qc #Gene with low count and expression values in more than threshold (sample_fraction=0.9)
 # are removed by applying the function. Dim 19948x175, so removed 14 genes
@@ -479,19 +469,21 @@ metadata(seo) |>names()
 plotGeneQC(seo_qc)
 plotGeneQC(seo_qc, top_n=12, ordannots = "SlideName", col = SlideName, point_size = 2)
 plotGeneQC(seo_qc, top_n=12, ordannots = "tissue", col = tissue, point_size = 2)
+plotGeneQC(seo_qc, top_n =12, ordannots = "NF-H-_CD45-_Edge_Gland", col = 'NF-H-_CD45-_Edge_Gland', point_size = 2 )
+
 sapply(seo_qc@colData, class)
-dev.off()
-plot(rnorm(50), rnorm(50))
+#Numeric Values: AOISurfaceArea, AOINucleiCount, 
+#RawReads, AlignedReads, DeduplicatedReads, TrimmedReads, StitchedReads, 
+#SequencingSaturation, lib_size, countOfLowEprGenes, percentOfLowEprGene
 
 #colData(seo)$regions
 #colnames(seo) %>% print() 
 
-# data("seo_qc")
-# seo_subset <-  addPerROIQC(seo_qc) #Wrong; already done this step to get seo_qc
-# plotGeneQC(seo_subset)
-
 #Final data of this segment: seo_qc
 #### ROI level QC [seo_qc_roi]----
+
+plotROIQC(seo_qc)
+
 plotROIQC(seo_qc, x_threshold = 150, color = SlideName)
 
 colData(seo_qc)$AOINucleiCount 
@@ -519,6 +511,21 @@ plotROIQC(seo_qc_roi,
           x_axis = "AOINucleiCount", #Default
           y_threshold = 1e+01, 
           color = SlideName)
+
+plotROIQC(seo_qc_roi,
+          x_axis = "SequencingSaturation",
+          x_lab = "Sequencing Saturation",
+          y_axis = "lib_size",
+          y_lab = "Library Size",
+          col = SlideName)
+
+
+plotROIQC(seo_qc_roi,
+          x_axis = "SequencingSaturation",
+          x_lab = "Sequencing Saturation",
+          y_axis = "AOISurfaceArea",
+          y_lab = "AOISurfaceArea",
+          col = SlideName)
 
 # Relative log expression distribution
 plotRLExpr(seo) #RLE of raw count 

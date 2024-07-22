@@ -1,18 +1,19 @@
 ## DEG Analysis Code Reformatting -Ongoing Original Working code still there 832 to 1310
 
 #### COMPARISON BETWEEN GROUPS [VOLCANO PLOT]----
-COMPARE_TABLE <- as.data.frame(cbind(COMPARE_GROUP_NAME=c("SlideName", "SlideName", "SlideName","SlideName_Neuron","SlideName_Neuron","SlideName_Neuron","SlideName_Neuron"),
-                  GROUP1_NAME=c("Sympa","FP", "IBTP", "Sympa_NF_H_POS","FP_NF_H_POS","Sympa_NF_H_POS","Sympa_NF_H_NEG"),
-                  GROUP2_NAME=c("FP","BBP", "Sympa","Sympa_NF_H_NEG","FP_NF_H_NEG","FP_NF_H_POS","FP_NF_H_NEG")))
-
 # Inputs: Sample_Data, Counts_Data, Feature_Data, Normalized Counts Data
 # Ensure the input files exist
 if (exists ("Sample_Data") & exists ("Counts_Data") & exists ("Feature_Data") &
     exists ("Normalized_Counts_Data_TMM")) {
   print("All Required Files Exist")
 } else {
-  print("Input Files Don't Exist, Load Them")
+  print("All Input Files Don't Exist, Load Them")
 }
+
+COMPARE_TABLE <- as.data.frame(cbind(
+  COMPARE_GROUP_NAME=c("SlideName", "SlideName", "SlideName","SlideName_Neuron","SlideName_Neuron","SlideName_Neuron","SlideName_Neuron"),
+          GROUP1_NAME=c("Sympa","FP", "IBTP", "Sympa_NF_H_POS","FP_NF_H_POS","Sympa_NF_H_POS","Sympa_NF_H_NEG"),
+          GROUP2_NAME=c("FP","BBP", "Sympa","Sympa_NF_H_NEG","FP_NF_H_NEG","FP_NF_H_POS","FP_NF_H_NEG")))
 
 comp =1
 for (comp in 1:1) {
