@@ -13,9 +13,10 @@
 # Ignore all files in io directory
 input/*
 output/*
-# Except these files in those directory
-!input/*.example
 
+# Except these files in those directory
+!README.md.png
+!input/*.example
 !input/GSEA/
 !input/GSEA/*.gmt
 !input/*.example
