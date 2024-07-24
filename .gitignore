@@ -10,6 +10,7 @@
 # Figures 
 *.png
 *.pdf
+*.xlsx
 # Ignore all files in io directory
 input/*
 output/*
