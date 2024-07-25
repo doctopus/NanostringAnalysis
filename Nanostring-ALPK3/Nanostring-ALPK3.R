@@ -41,6 +41,34 @@ setupProject <- function(project) {
   assign("input_dir", input_dir, envir = .GlobalEnv)
   assign("output_dir", output_dir, envir = .GlobalEnv)
 }
+install_and_load_packages <- function(cran_packages, bioc_packages) {
+  # Install missing CRAN packages
+  new_packages_cran <- cran_packages[!(cran_packages %in% installed.packages()[, "Package"])]
+  if (length(new_packages_cran) > 0) {install.packages(new_packages_cran)}
+  # Install missing Bioconductor packages
+  new_packages_bioc <- bioc_packages[!(bioc_packages %in% installed.packages()[, "Package"])]
+  if (length(new_packages_bioc) > 0) {
+    if (!requireNamespace("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
+    BiocManager::install(new_packages_bioc, update = FALSE)
+  }
+  # Load all packages
+  all_packages <- c(cran_packages, bioc_packages)
+  sapply(all_packages, require, character.only = TRUE)
+}
+sentence_case <- function(name) { 
+  # Sentence case first word if not uppercase with/out numbers/"-" (eg.DN-A1)
+  # Split the sentence into words
+  words <- unlist(strsplit(name, " "))
+  # Check if the first word should be converted
+  first_word <- words[1]
+  if (!grepl("^[A-Z0-9]+$", first_word) && !grepl("-", first_word)) {
+    # Convert the first word to sentence case
+    words[1] <- paste0(toupper(substring(first_word, 1, 1)), tolower(substring(first_word, 2)))
+  }
+  # Join the words back into a sentence
+  return(paste(words, collapse = " "))
+}
+
 savePDF <- function(figure, fileName, w = 7, h = 10) {
   currentDate <- format(Sys.Date(), "%Y%m%d") #current date in YYYYMMDD format
   # Define the directory for saving figures
@@ -64,32 +92,7 @@ savePNG <- function(figure, fileName, w = 900, h = 1300) {
   print(figure)
   dev.off()
 }
-install_and_load_packages <- function(cran_packages, bioc_packages) {
-  # Install missing CRAN packages
-  new_packages_cran <- cran_packages[!(cran_packages %in% installed.packages()[, "Package"])]
-  if (length(new_packages_cran) > 0) {install.packages(new_packages_cran)}
-  # Install missing Bioconductor packages
-  new_packages_bioc <- bioc_packages[!(bioc_packages %in% installed.packages()[, "Package"])]
-  if (length(new_packages_bioc) > 0) {
-    if (!requireNamespace("BiocManager", quietly = TRUE)) {install.packages("BiocManager")}
-    BiocManager::install(new_packages_bioc, update = FALSE)
-  }
-  # Load all packages
-  all_packages <- c(cran_packages, bioc_packages)
-  sapply(all_packages, require, character.only = TRUE)
-}
-sentence_case <- function(name) { # Sentence case first word if not uppercase with/out numbers/"-" (eg.DN-A1)
-  # Split the sentence into words
-  words <- unlist(strsplit(name, " "))
-  # Check if the first word should be converted
-  first_word <- words[1]
-  if (!grepl("^[A-Z0-9]+$", first_word) && !grepl("-", first_word)) {
-    # Convert the first word to sentence case
-    words[1] <- paste0(toupper(substring(first_word, 1, 1)), tolower(substring(first_word, 2)))
-  }
-  # Join the words back into a sentence
-  return(paste(words, collapse = " "))
-}
+
 heatmap_func_ss_old <- function(Input_DF,COL_ANNOT, NoofRows){
   Heatmap_Data <- Input_DF
   Heatmap_Data <- Heatmap_Data[order(matrixStats:::rowVars(as.matrix(Heatmap_Data)),decreasing = T),]
@@ -296,32 +299,101 @@ cran_packages <- c("colorRamp2", "DT", "ggalluvial", "ggrepel", "igraph", "magic
 bioc_packages <- c("ComplexHeatmap", "edgeR", "GSEABase", "GSVA", "limma", "msigdb", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
 install_and_load_packages(cran_packages, bioc_packages)
 
-#### Source & Process Input files ----
-#Since the data is normalized counts; can not run the DESeq2 Pipeline
-#So resorting to Limma Voom. Pipeline. Install edgeR, that installs limma as a dependency
-
-# library("edgeR")
-# library("tidyverse")
-getwd()
+######## Source & Process Input files ----
+# sampleAnnoFile from SegmentProperties sheet
+# countFile & featureAnnoFile from BioProbeCountMatrix sheet
+#### sampleAnnoFile----
 file_samplesheet<-paste0(input_dir,"/samplesheet_2.csv")
-file_source<-paste0(input_dir,"/ALPK3 KD in 358 Nanostring Q3 Normalized Data.xlsx")
-file_gene_of_interest <- paste0(input_dir, "/Crispr screen gene targets.xlsx")
+file_source<-paste0(input_dir,"/ALPK3 experiment Initial Dataset .xlsx")
+# file_gene_of_interest <- paste0(input_dir, "/Crispr screen gene targets.xlsx")
+#SegmentProperties Worksheet: SegmentDisplayName is default column
+pre_sampleAnnoFile <- readxl::read_excel(file_source, sheet="SegmentProperties")
 
-## Process input files
+colnames(pre_sampleAnnoFile)[colnames(pre_sampleAnnoFile)=='sample'] <- 'Sample'
 
-normalized_counts <- readxl::read_excel(file_source, sheet = "TargetCountMatrix")
-Normalized_Counts_Data <- data.frame(normalized_counts, check.names= FALSE, row.names = "TargetName")
+sampleAnnoFile <- pre_sampleAnnoFile %>% 
+  as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
-featureData <- readxl::read_excel(file_source, col_types= "text", sheet = "BioProbeProperties")
-featureData <- featureData %>% filter(TargetName!="NegProbe-WTX")
-# ↓ Does not work since NegProbe-WTX are many. In normalized counts however, it is one. 
-# May need to remove or deal with these NegProbe-WTX to use Features_Data 
-# Removed all where TargetName is NegProbe-WTX
-Features_Data <- data.frame(featureData, check.names = FALSE, row.names = "TargetName")
+  # mutate(SlideName = gsub(" breast", "", #Format texts; remove extra words and signs
+  #                         gsub(" 1/2-", "", SlideName)),
+  #        ScanLabel = gsub(" 1/2-", "", ScanLabel),
+  #        SegmentDisplayName = gsub(" 1/2-", "", SegmentDisplayName),
+  #        tissue = gsub(" ", "_", tissue)) %>% 
+  # mutate_at(6:18, ~ as.logical(.)) %>% 
+  # as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
-Sample_Data<-read.csv(file = file_samplesheet, 
-                     header=TRUE, 
-                     stringsAsFactors = FALSE, #Made false to keep it as character
+#### featureAnnoFile----
+#BioProbeCountMatrix Worksheet: TargetName is default column
+pre_featureAnnoFile <- readxl::read_excel(file_source, sheet = "BioProbeCountMatrix")
+
+next_featureAnnoFile <- dplyr::select(pre_featureAnnoFile, 1:12) %>% #Get the featureData relevant columns only
+  dplyr::select(TargetName, everything())
+
+#Process the duplicates where the Targetname is not NegProbe-WTX and then combine them back
+#Isolate rows with "NegProbe-WTX" in TargetName
+featureAnnoFile_NegProbeWTX <- next_featureAnnoFile %>%
+  filter(TargetName == "NegProbe-WTX")
+
+featureAnnoFile_others <- next_featureAnnoFile %>%
+  filter(TargetName != "NegProbe-WTX") %>% # Remaining rows with genes in TargetName
+  mutate(GeneID = as.character(GeneID)) %>% # Convert GeneID num -> character
+  group_by(TargetName) %>% # Concatenate unique values of duplicate TargetNames
+  summarise(across(
+    .cols = everything(),
+    .fns = ~ if (n() > 1) {
+      unique_values <- unique(trimws(unlist(strsplit(as.character(.), ","))))
+      paste(unique_values, collapse = ",")
+    } else {
+      .[1]
+    }
+  ), .groups = "drop") %>%
+  rowwise() %>%
+  mutate(GeneID = next_featureAnnoFile$GeneID[match(TargetName, next_featureAnnoFile$TargetName)][1])
+
+
+# Combine both processed datasets
+featureAnnoFile <- bind_rows(featureAnnoFile_NegProbeWTX, featureAnnoFile_others) %>% 
+  as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
+
+#As TargetName (Which is the default Defined column of Nanostring Data) which holds gene Name and also multiple NegProbe-WTX 
+#is not retained, so create anther column to retain it for DEG analysis.
+featureAnnoFile[,"TargetGene"] <- featureAnnoFile[,"TargetName"]
+
+#### countFile----
+pre_countFile <- readxl::read_excel(file_source,sheet="BioProbeCountMatrix") 
+next_countFile <- pre_countFile %>%   dplyr::select(., c(3, 13:79)) %>% #Select the rest of sheet after the featureAnnoFile
+  # filter(TargetName !=duplicates) %>%
+  # setNames(c(gsub(" 1/2-", "", colnames(.)))) %>% 
+  as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
+
+#Process the duplicates where the Targetname is not NegProbe-WTX and then combine them back
+#countFile_NegProbeWTX <- countFile[which(countFile[,"TargetName"]=="NegProbe-WTX"),]
+countFile_NegProbeWTX <- next_countFile %>% filter(TargetName == "NegProbe-WTX")
+
+countFile_others <- next_countFile %>%
+  filter(TargetName != "NegProbe-WTX") %>%
+  # mutate_at(c("GeneID"), as.character) %>% 
+  group_by(TargetName) %>%
+  summarise(across(everything(), ~ sum(., na.rm = TRUE)), .groups = "drop")
+# Combine
+countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>% 
+  as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
+
+
+
+# normalized_counts <- readxl::read_excel(file_source, sheet = "TargetCountMatrix")
+# Normalized_Counts_Data <- data.frame(normalized_counts, check.names= FALSE, row.names = "TargetName")
+# 
+# featureData <- readxl::read_excel(file_source, col_types= "text", sheet = "BioProbeProperties")
+# featureData <- featureData %>% filter(TargetName!="NegProbe-WTX")
+# # ↓ Does not work since NegProbe-WTX are many. In normalized counts however, it is one. 
+# # May need to remove or deal with these NegProbe-WTX to use Features_Data 
+# # Removed all where TargetName is NegProbe-WTX
+# Features_Data <- data.frame(featureData, check.names = FALSE, row.names = "TargetName")
+#Sample ----
+Sample_Data<-read.csv(file = file_samplesheet,
+                     header=TRUE,
+                     stringsAsFactors = TRUE, #Make false to keep it as character
                      check.names = FALSE,
                      row.names = "TargetName")
 
@@ -333,16 +405,113 @@ GenesOfInterest <- unlist(genes) # Convert to simple list
 GenesOfInterest <- data.frame(GenesOfInterest)
 # print(GenesOfInterest) # Print the list
 
-#Old Code for reference (May Delete)----
-# sampleData<-read.csv(file = file_samplesheet, 
-#                      header=TRUE, 
-#                      stringsAsFactors = FALSE, #Need as characters for this heatmap code function
-#                      check.names = FALSE,
-#                      row.names = "sample")
-# sampleData <- sampleData[,c("cellLine", "drug")]
-# sampleData <- sampleData %>% mutate(drug = gsub("-", ".", drug))
-# sampleData[, c("cellLine", "drug")] <- lapply(sampleData[, c("cellLine", "drug")], factor)
-# head(sampleData)
+######## CREATE SPATIAL EXPERIMENT OBJECT [seo]----
+seo <- readGeoMx(countFile = countFile,
+                 sampleAnnoFile = sampleAnnoFile,
+                 featureAnnoFile = featureAnnoFile)
+
+######## QC Steps ---- 
+#Sample level QC
+# library(ggplot2)
+# library(ggalluvial)
+#Visualize the data
+plotSampleInfo(seo, column2plot =c("SlideName", "Sample"))
+plotSampleInfo(seo, column2plot =c("SlideName", "tissue")) + coord_flip()
+#### Gene level QC [seo_qc]----
+seo #Dim 19962x175
+names(colData(seo)) #46 Columns in ColData
+seo_qc <- addPerROIQC(seo, 
+                      sample_fraction = 0.9, #Default
+                      rm_genes =TRUE, #Default
+                      min_count = 5) #Default
+seo_qc #Gene with low count and expression values in more than threshold (sample_fraction=0.9)
+# are removed by applying the function. Dim 19948x175, so removed 14 genes
+dim(seo) 
+dim(seo_qc) #Genes not meeting the above criteria were removed 19962 > 19948 
+names(seo_qc@colData)
+seo_qc@colData
+view(colData(seo_qc)[ , c("countOfLowEprGene", "percentOfLowEprGene", "ScanLabel", "lib_size", "tissue")])
+view(colData(seo_qc))
+
+length(seo@metadata$genes_rm_rawCount) #0
+length(seo_qc@metadata$genes_rm_rawCount) #175
+names(seo_qc@metadata)
+metadata(seo_qc) |> names() #Same as above
+metadata(seo) |>names()
+
+#addPerROIQC added columns to colData :lib_size, countOfLowEprGene, percentOfLowEprGene
+# and also added columns to metadata: lcpm_threshold, genes_rm_rawCount, genes_rm_logCPM  
+
+
+# plotGeneQC(seo_qc, ordannots = "regions", col = regions, point_size = 2)
+plotGeneQC(seo_qc)
+plotGeneQC(seo_qc, top_n=12, ordannots = "SlideName", col = SlideName, point_size = 2)
+plotGeneQC(seo_qc, top_n=12, ordannots = "tissue", col = tissue, point_size = 2)
+plotGeneQC(seo_qc, top_n =12, ordannots = "NF-H-_CD45-_Edge_Gland", col = 'NF-H-_CD45-_Edge_Gland', point_size = 2 )
+
+sapply(seo_qc@colData, class)
+#Numeric Values: AOISurfaceArea, AOINucleiCount, 
+#RawReads, AlignedReads, DeduplicatedReads, TrimmedReads, StitchedReads, 
+#SequencingSaturation, lib_size, countOfLowEprGenes, percentOfLowEprGene
+
+#colData(seo)$regions
+#colnames(seo) %>% print() 
+
+#Final data of this segment: seo_qc
+#### ROI level QC [seo_qc_roi]----
+
+plotROIQC(seo_qc)
+
+plotROIQC(seo_qc, x_threshold = 150, color = SlideName)
+
+colData(seo_qc)$AOINucleiCount 
+#same as
+seo_qc@colData$AOINucleiCount
+
+#AOINuclei count of 150 looks like a good threshold from the figure
+qc <- colData(seo_qc)$AOINucleiCount > 150
+table(qc) # 3 Values Below threshold
+dim(seo_qc) # Dim 19948x175
+seo_qc_roi <- seo_qc[, qc]
+dim(seo_qc_roi) # We removed 3 ROI (samples/columns)from dataset. Dim 19948x172
+# Comparing the Library Size with ROI Area size
+
+plotROIQC(seo_qc_roi, 
+          x_threshold = 20000, 
+          x_axis = "AOISurfaceArea", 
+          x_lab = "AreaSize", 
+          y_axis = "lib_size", 
+          y_lab = "Library Size", 
+          col = SlideName)
+
+plotROIQC(seo_qc_roi, 
+          x_threshold = 150, 
+          x_axis = "AOINucleiCount", #Default
+          y_threshold = 1e+01, 
+          color = SlideName)
+
+plotROIQC(seo_qc_roi,
+          x_axis = "SequencingSaturation",
+          x_lab = "Sequencing Saturation",
+          y_axis = "lib_size",
+          y_lab = "Library Size",
+          col = SlideName)
+
+
+plotROIQC(seo_qc_roi,
+          x_axis = "SequencingSaturation",
+          x_lab = "Sequencing Saturation",
+          y_axis = "AOISurfaceArea",
+          y_lab = "AOISurfaceArea",
+          col = SlideName)
+
+# Relative log expression distribution
+plotRLExpr(seo) #RLE of raw count 
+plotRLExpr(seo_qc_roi)
+#Remove the technical variations due to the library size differences
+plotRLExpr(seo_qc_roi, ordannots = "SlideName", assay = 2, color = SlideName)
+#can also plot by tissue type or other classification
+plotRLExpr(seo_qc_roi, ordannots = "tissue", assay = 2, color = tissue)
 
 #### ssGSEA Analysis----
 # library("ComplexHeatmap")

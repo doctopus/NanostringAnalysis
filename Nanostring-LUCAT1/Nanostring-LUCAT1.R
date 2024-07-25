@@ -1,8 +1,8 @@
-#===
+#====
 #Vignette using DCC and PKC Files of NanoString: https://bioconductor.org/packages/devel/workflows/vignettes/GeoMxWorkflows/inst/doc/GeomxTools_RNA-NGS_Analysis.html
 #Vignette using CountData of NanoString: https://davislaboratory.github.io/GeoMXAnalysisWorkflow/articles/GeoMXAnalysisWorkflow.html
 #Vignette partial upto data preparation: https://davislaboratory.github.io/standR/articles/standR_introduction.html
-#===
+#====
 
 ##### Define Functions########################
 setupProject <- function(project) {
