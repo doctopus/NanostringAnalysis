@@ -21,8 +21,8 @@ install_and_load_packages <- function(cran_packages, bioc_packages) {
   sapply(all_packages, require, character.only = TRUE)
 }
 ## Install & Load Packages
-cran_packages <- c("circlize", "colorRamp2", "DT", "ggalluvial", "ggrepel", "grid", "igraph", "magick", "patchwork", "RColorBrewer", "tidyverse")
-bioc_packages <- c("ComplexHeatmap","edgeR", "fsgsea", "GSEABase", "GSVA", "limma", "msigdb", "msigdbr", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
+cran_packages <- c("circlize", "clipr", "colorRamp2", "DT", "ggalluvial", "ggrepel", "grid", "igraph", "magick", "patchwork", "RColorBrewer", "tidyverse")
+bioc_packages <- c("ComplexHeatmap","edgeR", "fgsea", "GSEABase", "GSVA", "limma", "msigdb", "msigdbr", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
 install_and_load_packages(cran_packages, bioc_packages)
 #### Non-Function Way of Getting Pathway specific genes from MSIGDB----
 M <- msigdbr(species = "Mus musculus", category = "C2", subcategory = "CP")
@@ -41,6 +41,7 @@ write_clip(MTORC1_Signaling_Pathway_Genes)
 
 #### Retrieve mouse gene sets ----
 msigdb_mouse = msigdbr(species = "Mus musculus") #3783805
+
 #Unique number of genes
 print(length(unique(msigdb_mouse$gene_symbol))) #17961
 print(length(unique(msigdb_mouse$gs_name))) #32872
@@ -49,6 +50,20 @@ print(length(unique(msigdb_mouse$gs_name))) #32872
 wnt_genesets_mouse = msigdb_mouse %>%
   filter(grepl("WNT", gs_name, ignore.case = TRUE) | 
            grepl("WNT", gs_description, ignore.case = TRUE))
+
+#Filter Immune related pathways
+immune_pathways = msigdb_mouse %>% 
+  filter(grepl("IMMUN", gs_name, ignore.case = TRUE) )#&
+           # grepl("IMMUN", gs_description, ignore.case = TRUE))
+print(length(unique(immune_pathways$gs_name)))
+immune_pathways_unique <- unique(immune_pathways$gs_name)
+
+immune_pathways_df <- data.frame("Immune Related Pathways" = unlist(immune_pathways_unique))
+write_clip(immune_pathways_df)
+# Display the data frame
+print(immune_pathways_df)
+
+
 
 # Extract unique genes associated with Wnt signaling
 wnt_genes_mouse = unique(wnt_genesets_mouse$gene_symbol)

@@ -63,7 +63,8 @@ sentence_case <- function(name) {
   first_word <- words[1]
   if (!grepl("^[A-Z0-9]+$", first_word) && !grepl("-", first_word)) {
     # Convert the first word to sentence case
-    words[1] <- paste0(toupper(substring(first_word, 1, 1)), tolower(substring(first_word, 2)))
+    words[1] <- paste0(toupper(substring(first_word, 1, 1)), 
+                       tolower(substring(first_word, 2)))
   }
   # Join the words back into a sentence
   return(paste(words, collapse = " "))
@@ -288,7 +289,7 @@ heatmap_func_ss <- function(Input_DF, COL_ANNOT, NoofRows, UNIT) {
   return(INPUT_DATA_HEATMAP)
 }
 
-##### Setup Project ----
+######## Setup Project ----
 ## Initiate project
 setupProject("Nanostring-ALPK3") ; print(paste0("Working dir is: ", getwd()))
 # If any project specific override: output folder if any
@@ -302,25 +303,32 @@ install_and_load_packages(cran_packages, bioc_packages)
 ######## Source & Process Input files ----
 # sampleAnnoFile from SegmentProperties sheet
 # countFile & featureAnnoFile from BioProbeCountMatrix sheet
-#### sampleAnnoFile----
 file_samplesheet<-paste0(input_dir,"/samplesheet_2.csv")
 file_source<-paste0(input_dir,"/ALPK3 experiment Initial Dataset .xlsx")
-# file_gene_of_interest <- paste0(input_dir, "/Crispr screen gene targets.xlsx")
+file_gene_of_interest <- paste0(input_dir, "/Crispr screen gene targets.xlsx")
+#### sampleAnnoFile----
 #SegmentProperties Worksheet: SegmentDisplayName is default column
 pre_sampleAnnoFile <- readxl::read_excel(file_source, sheet="SegmentProperties")
 
-colnames(pre_sampleAnnoFile)[colnames(pre_sampleAnnoFile)=='sample'] <- 'Sample'
-
-sampleAnnoFile <- pre_sampleAnnoFile %>% 
+# colnames(pre_sampleAnnoFile)[colnames(pre_sampleAnnoFile)=='sample'] <- 'Sample'
+# don't rename column "sample" as we'll remove it altogether after. getting data from it
+sampleAnnoFile <- pre_sampleAnnoFile %>%
+  mutate(
+    Sample = case_when(
+      is.na(sample) ~ NA_character_,
+      grepl("ALPK3 KD", sample) ~ "ALPK3 KD",
+      grepl("Control", sample) ~ "Control",
+      TRUE ~ NA_character_
+    ),
+    Tumor = case_when(
+      is.na(sample) ~ NA_character_,
+      grepl("Tumor Edge", sample) ~ "Tumor Edge",
+      grepl("Tumor Inside", sample) ~ "Tumor Inside",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  dplyr::select(-sample) %>% 
   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
-
-  # mutate(SlideName = gsub(" breast", "", #Format texts; remove extra words and signs
-  #                         gsub(" 1/2-", "", SlideName)),
-  #        ScanLabel = gsub(" 1/2-", "", ScanLabel),
-  #        SegmentDisplayName = gsub(" 1/2-", "", SegmentDisplayName),
-  #        tissue = gsub(" ", "_", tissue)) %>% 
-  # mutate_at(6:18, ~ as.logical(.)) %>% 
-  # as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
 #### featureAnnoFile----
 #BioProbeCountMatrix Worksheet: TargetName is default column
@@ -379,25 +387,14 @@ countFile_others <- next_countFile %>%
 countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>% 
   as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
 
-
-
-# normalized_counts <- readxl::read_excel(file_source, sheet = "TargetCountMatrix")
-# Normalized_Counts_Data <- data.frame(normalized_counts, check.names= FALSE, row.names = "TargetName")
-# 
-# featureData <- readxl::read_excel(file_source, col_types= "text", sheet = "BioProbeProperties")
-# featureData <- featureData %>% filter(TargetName!="NegProbe-WTX")
-# # ↓ Does not work since NegProbe-WTX are many. In normalized counts however, it is one. 
-# # May need to remove or deal with these NegProbe-WTX to use Features_Data 
-# # Removed all where TargetName is NegProbe-WTX
-# Features_Data <- data.frame(featureData, check.names = FALSE, row.names = "TargetName")
-#Sample ----
+#SampleData in-case Needed in Downstream----
 Sample_Data<-read.csv(file = file_samplesheet,
                      header=TRUE,
                      stringsAsFactors = TRUE, #Make false to keep it as character
                      check.names = FALSE,
                      row.names = "TargetName")
 
-#Getting the Collected GeneSet of Interest from Excel List
+#Getting the Collected GeneSet of Interest from Excel List for Downstream ----
 geneList <- readxl::read_excel(file_gene_of_interest, col_names = FALSE, sheet = "Sheet1")
 genesWithNa <- as.vector(as.matrix(geneList))
 genes <- values[!is.na(genesWithNa)] # Remove NA values
@@ -415,11 +412,11 @@ seo <- readGeoMx(countFile = countFile,
 # library(ggplot2)
 # library(ggalluvial)
 #Visualize the data
-plotSampleInfo(seo, column2plot =c("SlideName", "Sample"))
-plotSampleInfo(seo, column2plot =c("SlideName", "tissue")) + coord_flip()
+plotSampleInfo(seo, column2plot =c("Sample", "Tumor"))
+plotSampleInfo(seo, column2plot =c("SlideName", "Sample", "Tumor")) + coord_flip()
 #### Gene level QC [seo_qc]----
-seo #Dim 19962x175
-names(colData(seo)) #46 Columns in ColData
+seo #Dim 18676x67
+names(colData(seo)) #30 Columns in ColData
 seo_qc <- addPerROIQC(seo, 
                       sample_fraction = 0.9, #Default
                       rm_genes =TRUE, #Default
@@ -427,14 +424,14 @@ seo_qc <- addPerROIQC(seo,
 seo_qc #Gene with low count and expression values in more than threshold (sample_fraction=0.9)
 # are removed by applying the function. Dim 19948x175, so removed 14 genes
 dim(seo) 
-dim(seo_qc) #Genes not meeting the above criteria were removed 19962 > 19948 
+dim(seo_qc) #Genes not meeting the above criteria were removed [Nothing] 18676x67 > 18676x67
 names(seo_qc@colData)
 seo_qc@colData
 view(colData(seo_qc)[ , c("countOfLowEprGene", "percentOfLowEprGene", "ScanLabel", "lib_size", "tissue")])
 view(colData(seo_qc))
 
 length(seo@metadata$genes_rm_rawCount) #0
-length(seo_qc@metadata$genes_rm_rawCount) #175
+length(seo_qc@metadata$genes_rm_rawCount) #67 Data added. to the field
 names(seo_qc@metadata)
 metadata(seo_qc) |> names() #Same as above
 metadata(seo) |>names()
@@ -445,8 +442,9 @@ metadata(seo) |>names()
 
 # plotGeneQC(seo_qc, ordannots = "regions", col = regions, point_size = 2)
 plotGeneQC(seo_qc)
+
 plotGeneQC(seo_qc, top_n=12, ordannots = "SlideName", col = SlideName, point_size = 2)
-plotGeneQC(seo_qc, top_n=12, ordannots = "tissue", col = tissue, point_size = 2)
+plotGeneQC(seo_qc, top_n=12, ordannots = "Sample", col = Sample, point_size = 2)
 plotGeneQC(seo_qc, top_n =12, ordannots = "NF-H-_CD45-_Edge_Gland", col = 'NF-H-_CD45-_Edge_Gland', point_size = 2 )
 
 sapply(seo_qc@colData, class)
@@ -459,36 +457,41 @@ sapply(seo_qc@colData, class)
 
 #Final data of this segment: seo_qc
 #### ROI level QC [seo_qc_roi]----
+names(colData(seo_qc))
 
 plotROIQC(seo_qc)
 
-plotROIQC(seo_qc, x_threshold = 150, color = SlideName)
+plotROIQC(seo_qc, x_threshold = 900, color = Sample)
+plotROIQC(seo_qc, 
+          x_axis = "lib_size", x_threshold = 1e+01, 
+          y_axis = "AOISurfaceArea", y_threshold = "AOISurfaceArea",
+          col = Sample)
 
 colData(seo_qc)$AOINucleiCount 
 #same as
 seo_qc@colData$AOINucleiCount
 
 #AOINuclei count of 150 looks like a good threshold from the figure
-qc <- colData(seo_qc)$AOINucleiCount > 150
+qc <- colData(seo_qc)$AOINucleiCount > 900 
 table(qc) # 3 Values Below threshold
 dim(seo_qc) # Dim 19948x175
 seo_qc_roi <- seo_qc[, qc]
-dim(seo_qc_roi) # We removed 3 ROI (samples/columns)from dataset. Dim 19948x172
+dim(seo_qc_roi) # We removed 3 ROI (samples/columns)from dataset. Dim 18676 >
 # Comparing the Library Size with ROI Area size
 
-plotROIQC(seo_qc_roi, 
+plotROIQC(seo_qc, 
           x_threshold = 20000, 
           x_axis = "AOISurfaceArea", 
           x_lab = "AreaSize", 
           y_axis = "lib_size", 
           y_lab = "Library Size", 
-          col = SlideName)
+          col = Sample)
 
 plotROIQC(seo_qc_roi, 
-          x_threshold = 150, 
+          # x_threshold = 150, 
           x_axis = "AOINucleiCount", #Default
-          y_threshold = 1e+01, 
-          color = SlideName)
+          # y_threshold = 1e+01, 
+          color = Sample)
 
 plotROIQC(seo_qc_roi,
           x_axis = "SequencingSaturation",

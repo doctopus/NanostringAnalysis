@@ -210,7 +210,7 @@ setupProject("Nanostring-ANS") ; print(paste0("Working dir is: ", getwd()))
 # output_dir <- paste0(output_dir, "/1.1_Nanostring")
 
 ## Install & Load Packages
-cran_packages <- c("circlize", "colorRamp2", "DT", "ggalluvial", "ggrepel", "grid", "igraph", "magick", "patchwork", "RColorBrewer", "tidyverse")
+cran_packages <- c("circlize", "clipr", "colorRamp2", "DT", "ggalluvial", "ggrepel", "grid", "igraph", "magick", "patchwork", "RColorBrewer", "tidyverse")
 bioc_packages <- c("ComplexHeatmap","edgeR", "fgsea", "GSEABase", "GSVA", "limma", "msigdb", "msigdbr", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
 install_and_load_packages(cran_packages, bioc_packages)
 
@@ -489,14 +489,23 @@ plotROIQC(seo_qc, x_threshold = 150, color = SlideName)
 colData(seo_qc)$AOINucleiCount 
 #same as
 seo_qc@colData$AOINucleiCount
-
+names(seo_qc@colData)
 #AOINuclei count of 150 looks like a good threshold from the figure
-qc <- colData(seo_qc)$AOINucleiCount > 150
-table(qc) # 3 Values Below threshold
+qc_keep <- colData(seo_qc)$AOINucleiCount > 150 &
+  colData(seo_qc)$RawReads > 1e+06 &
+  colData(seo_qc)$SlideName != 'TR' &
+  colData(seo_qc)$AlignedReads > 80 &
+  colData(seo_qc)$TrimmedReads > 80 &
+  colData(seo_qc)$StitchedReads > 80 &
+  colData(seo_qc)$SequencingSaturation > 50
+
+table(qc_keep) # 3 Values Below threshold
 dim(seo_qc) # Dim 19948x175
-seo_qc_roi <- seo_qc[, qc]
+seo_qc_roi <- seo_qc[, qc_keep]
 dim(seo_qc_roi) # We removed 3 ROI (samples/columns)from dataset. Dim 19948x172
+#In second analysis we removed 28 samples, and went ahead with 147 ROIs.
 # Comparing the Library Size with ROI Area size
+view(seo_qc_roi@colData)
 
 plotROIQC(seo_qc_roi, 
           x_threshold = 20000, 
@@ -515,6 +524,7 @@ plotROIQC(seo_qc_roi,
 plotROIQC(seo_qc_roi,
           x_axis = "SequencingSaturation",
           x_lab = "Sequencing Saturation",
+          x_threshold = 50, 
           y_axis = "lib_size",
           y_lab = "Library Size",
           col = SlideName)
@@ -525,6 +535,46 @@ plotROIQC(seo_qc_roi,
           x_lab = "Sequencing Saturation",
           y_axis = "AOISurfaceArea",
           y_lab = "AOISurfaceArea",
+          col = SlideName)
+
+plotROIQC(seo_qc_roi,
+          x_axis = "RawReads",
+          x_lab = "Raw Reads",
+          x_threshold = 1e+06, 
+          y_axis = "AOISurfaceArea",
+          y_lab = "AOISurfaceArea",
+          col = SlideName)
+
+plotROIQC(seo_qc_roi,
+          x_axis = "RawReads",
+          x_lab = "Raw Reads",
+          x_threshold = 1e+06, 
+          y_axis = "AOINucleiCount",
+          y_lab = "AOINucleiCount",
+          col = SlideName)
+
+plotROIQC(seo_qc_roi,
+          x_axis = "AlignedReads",
+          x_lab = "Aligned Reads",
+          x_threshold = 80,
+          y_axis = "AOINucleiCount",
+          y_lab = "AOINucleiCount",
+          col = SlideName)
+
+plotROIQC(seo_qc_roi,
+          x_axis = "TrimmedReads",
+          x_lab = "Trimmed Reads",
+          x_threshold = 80,
+          y_axis = "AOINucleiCount",
+          y_lab = "AOINucleiCount",
+          col = SlideName)
+
+plotROIQC(seo_qc_roi,
+          x_axis = "StitchedReads",
+          x_lab = "Stitched Reads",
+          x_threshold = 80,
+          y_axis = "AOINucleiCount",
+          y_lab = "AOINucleiCount",
           col = SlideName)
 
 # Relative log expression distribution
