@@ -1,7 +1,14 @@
-## DEG Analysis Code Reformatting -Ongoing Original Working code still there 832 to 1310
+## DEG Analysis Code Reformatting -Ongoing Original Working code still there 889 to 1367
 
 #### COMPARISON BETWEEN GROUPS [VOLCANO PLOT]----
 # Inputs: Sample_Data, Counts_Data, Feature_Data, Normalized Counts Data
+#Sample_Data should have had the SlideName alrerady modified by now, and ROI Column added,
+#Ensure that it is indeed added.
+# Sample_Data <- Sample_Data %>% mutate(SlideName = gsub("BBP", "BFP", SlideName))
+# Sample_Data[, "ROI"] <-  rownames(Sample_Data)
+#Normalized counts data should be imported from the previously prepared data
+Normalized_Counts_Data <- Normalized_Counts_Data_TMM
+
 # Ensure the input files exist
 if (exists ("Sample_Data") & exists ("Counts_Data") & exists ("Feature_Data") &
     exists ("Normalized_Counts_Data_TMM")) {
@@ -10,13 +17,14 @@ if (exists ("Sample_Data") & exists ("Counts_Data") & exists ("Feature_Data") &
   print("All Input Files Don't Exist, Load Them")
 }
 
+
 COMPARE_TABLE <- as.data.frame(cbind(
   COMPARE_GROUP_NAME=c("SlideName", "SlideName", "SlideName","SlideName_Neuron","SlideName_Neuron","SlideName_Neuron","SlideName_Neuron"),
           GROUP1_NAME=c("Sympa","FP", "IBTP", "Sympa_NF_H_POS","FP_NF_H_POS","Sympa_NF_H_POS","Sympa_NF_H_NEG"),
           GROUP2_NAME=c("FP","BBP", "Sympa","Sympa_NF_H_NEG","FP_NF_H_NEG","FP_NF_H_POS","FP_NF_H_NEG")))
 
-comp =1
-for (comp in 1:1) {
+comp =1 #[INPUT_NEEDED]
+for (comp in 1:1) { #[INPUT_NEEDED]
   print (comp)
   COMPARE_GROUP_NAME = COMPARE_TABLE[comp,"COMPARE_GROUP_NAME"] 
   GROUP1_NAME = COMPARE_TABLE[comp,"GROUP1_NAME"] 
@@ -74,7 +82,7 @@ for (comp in 1:1) {
   design <- model.matrix(~0 + Group , data = colData(EXP_GeoMX_DSP_Data_FOR_COMPARISION))
   colnames(design) <- gsub("^Group","",colnames(design))
   colnames(design) <- gsub(" ","_",colnames(design))
-  write.table(design,paste(GROUP1_NAME,"_VS_",GROUP2_NAME,"_DESIGN_MATRIX.txt",sep=""),sep="\t",row.names = T,col.names = T,quote = T)
+  write.table(design,paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_DESIGN_MATRIX.txt",sep=""),sep="\t",row.names = T,col.names = T,quote = T)
   print("EDGER")
   print(dim(design))
   print(colSums(design))
@@ -83,7 +91,7 @@ for (comp in 1:1) {
   #makeContrasts (Limma) = Construct the contrast matrix corresponding to specified contrasts of a set of parameters.
   ####################################
   contr.matrix <- makeContrasts(GROUP1_Vs_GROUP2 = get(GROUP1_NAME) - get(GROUP2_NAME),levels = colnames(design))
-  write.table(contr.matrix,paste(GROUP1_NAME,"_VS_",GROUP2_NAME,"_CONTRAST_MATRIX.txt",sep=""),sep="\t",row.names = T,col.names = T,quote = T)
+  write.table(contr.matrix,paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_CONTRAST_MATRIX.txt",sep=""),sep="\t",row.names = T,col.names = T,quote = T)
   
   #Based on the suggestions, we remove the filter out genes with low coverage in the dataset to allow a more accurate mean-variance relationship 
   #and reduce the number of statistical tests. Here we use the filterByExpr function from the edgeR package to filter genes based on the model matrix, 
@@ -93,7 +101,7 @@ for (comp in 1:1) {
   #######################################################3
   LowCoverage_Genes <- as.data.frame(as.character(rownames(dge)[!keep]))
   colnames(LowCoverage_Genes) <- "Gene"
-  write.table(LowCoverage_Genes,paste(GROUP1_NAME,"_VS_",GROUP2_NAME,"_LowCoverage_Genes.txt",sep=""),sep="\t",row.names = F,col.names = T,quote = T)
+  write.table(LowCoverage_Genes,paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_LowCoverage_Genes.txt",sep=""),sep="\t",row.names = F,col.names = T,quote = T)
   ######################################################
   ############################################################
   # Filter the Low expressing genes for the analysis
@@ -114,7 +122,7 @@ for (comp in 1:1) {
   )
   bcv_df[,"HighBCV"] <- ifelse(bcv_df[,"BCV"]>0.8,"HIGH-BCV","LOW-BCV")
   bcv_df <- bcv_df[order(bcv_df[,"BCV"],decreasing = T),]
-  write.table(bcv_df,paste(GROUP1_NAME,"_VS_",GROUP2_NAME,"_Genes_Biological_Variation_Coefficient.txt",sep=""),sep="\t",row.names = F,col.names = T,quote = T)
+  write.table(bcv_df,paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_Genes_Biological_Variation_Coefficient.txt",sep=""),sep="\t",row.names = F,col.names = T,quote = T)
   ######################################################
   highbcv <- bcv_df$BCV > 0.8
   highbcv_df <- bcv_df[highbcv, ]
@@ -123,7 +131,7 @@ for (comp in 1:1) {
   # Change it to ggplot
   ###############################################
   graphics.off()
-  pdf(paste(GROUP1_NAME,"_VS_",GROUP2_NAME,"_Genes_Biological_Variation_Coefficient.pdf",sep=""),width = 10,height = 10)
+  pdf(paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_Genes_Biological_Variation_Coefficient.pdf",sep=""),width = 10,height = 10)
   plotBCV(dge_all, legend.position = "topleft", ylim = c(0, 1.3))
   points(highbcv_df$AveLogCPM, highbcv_df$BCV, col = "#FF3158")
   text(highbcv_df$AveLogCPM, highbcv_df$BCV, labels = highbcv_df$gene_id, pos = 4,cex = 0.5)
@@ -132,7 +140,7 @@ for (comp in 1:1) {
   ### Differential Expression Analysis using   limma-voom pipeline
   ############################################################################
   graphics.off()
-  pdf(paste(GROUP1_NAME,"_VS_",GROUP2_NAME,"_Mean_Variance_Trend.pdf",sep=""),width = 10,height = 10)
+  pdf(paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_Mean_Variance_Trend.pdf",sep=""),width = 10,height = 10)
   limma_voom_v <- voom(dge_all, design, plot = TRUE) 
   graphics.off()
   
@@ -194,7 +202,7 @@ for (comp in 1:1) {
   colnames(GROUP1_VS_GROUP2_DE_EDGER_ANALYSIS) <- sapply(colnames(GROUP1_VS_GROUP2_DE_EDGER_ANALYSIS),function(x) gsub("GROUP1",GROUP1_NAME,as.character(x)))
   colnames(GROUP1_VS_GROUP2_DE_EDGER_ANALYSIS) <- sapply(colnames(GROUP1_VS_GROUP2_DE_EDGER_ANALYSIS),function(x) gsub("GROUP2",GROUP2_NAME,as.character(x)))
   ###########################################
-  write.table(GROUP1_VS_GROUP2_DE_EDGER_ANALYSIS,paste(GROUP1_NAME,"_VS_",GROUP2_NAME,"_",DEG_TEST,"_RESULTS.txt",sep=""),row.names = F,col.names = T,quote = T,sep="\t")
+  write.table(GROUP1_VS_GROUP2_DE_EDGER_ANALYSIS,paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_",DEG_TEST,"_RESULTS.txt",sep=""),row.names = F,col.names = T,quote = T,sep="\t")
   ########################################################################
   print(table(GROUP1_VS_GROUP2_DE_EDGER_ANALYSIS[,"PVALADJ_SIG_GENES"]))
   print(table(GROUP1_VS_GROUP2_DE_EDGER_ANALYSIS[,"PVAL_SIG_GENES"]))
@@ -231,8 +239,8 @@ for (comp in 1:1) {
     
     TEST = DEG_TESTS[test]
     print(TEST)
-    TEST_DIR <- paste(TEST,"/",sep="")
-    TEST_DATA <- read.delim(paste(GROUP1_NAME,"_VS_",GROUP2_NAME,"_",TEST,"_RESULTS.txt",sep=""),sep="\t",header = T,check.names = F,stringsAsFactors = F)
+    # TEST_DIR <- paste(output_dir, "/", TEST,"/",sep="")
+    TEST_DATA <- read.delim(paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_",TEST,"_RESULTS.txt",sep=""),sep="\t",header = T,check.names = F,stringsAsFactors = F)
     ############################################################
     Df_Positive_List[[TEST]] <- as.character(TEST_DATA[which(TEST_DATA[,"PVAL_SIG_GENES"]==1),"Gene"])
     Df_Negative_List[[TEST]] <- as.character(TEST_DATA[which(TEST_DATA[,"PVAL_SIG_GENES"]== -1),"Gene"])
@@ -278,7 +286,7 @@ for (comp in 1:1) {
     # PLOT_DATA[,"SIG_GENES"] <- ifelse(((abs(PLOT_DATA[,"THRESHOLD"])>=2) & (PLOT_DATA[,"Rank"]<=25)),PLOT_DATA[,"GENE"],PLOT_DATA[,"SIG_GENES"])
     ###~~~~~~~~~~~~
     ###^^^^^^^^^^^^^^^
-    # Milan Set significance thresholds
+    # Milan Set significance thresholds #[INPUT_NEEDED]
     wnt_genes_mouse_test <- c("Fzd10","Wnt3","Wnt6","Wnt5b","Wnt9b","Wnt11","Rspo3","Dkk4", "Draxin", "Ngf","Snai2","Sox2","Sox17","Adamts5","Adam11")
     log2fc_threshold <- log2(2)  # 2-fold change
     pval_threshold <- 0.05 #-log10(0.05)
@@ -286,7 +294,7 @@ for (comp in 1:1) {
     # Milan Identify significant genes from the curated list
     PLOT_DATA[,"SIG_GENES"] <- NA
     PLOT_DATA[,"SIG_GENES"] <- ifelse(
-      PLOT_DATA[,"GENE"] %in% wnt_genes_mouse &
+      PLOT_DATA[,"GENE"] %in% immune_pathways_genes_unique & #[INPUT_NEEDED] wnt_genes_mouse_test
         abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
         PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
       PLOT_DATA[,"GENE"],
@@ -300,13 +308,13 @@ for (comp in 1:1) {
     #                                 PLOT_DATA[,"PVAL"] > pval_threshold,
     #                               "Highlighted", "Not Highlighted")
     
-    ## Optional: Limit number of labeled genes to prevent overcrowding (Top 25 significant genes)
+    ## Optional: Limit number of labeled genes to prevent overcrowding (Top 25 significant genes) #[INPUT_NEEDED] or comment out below section
     #
-    # sig_genes <- PLOT_DATA[!is.na(PLOT_DATA[,"SIG_GENES"]),]
-    # sig_genes <- sig_genes[order(sig_genes[,"PVAL"], decreasing = TRUE),]  # Note: decreasing = TRUE because of -log10 transformation
-    # top_n <- min(25, nrow(sig_genes))
-    # top_genes <- sig_genes[1:top_n, "GENE"]
-    # PLOT_DATA[,"SIG_GENES"] <- ifelse(PLOT_DATA[,"GENE"] %in% top_genes, PLOT_DATA[,"GENE"], NA)
+    sig_genes <- PLOT_DATA[!is.na(PLOT_DATA[,"SIG_GENES"]),]
+    sig_genes <- sig_genes[order(sig_genes[,"PVAL"], decreasing = TRUE),]  # Note: decreasing = TRUE because of -log10 transformation
+    top_n <- min(100, nrow(sig_genes))
+    top_genes <- sig_genes[1:top_n, "GENE"]
+    PLOT_DATA[,"SIG_GENES"] <- ifelse(PLOT_DATA[,"GENE"] %in% top_genes, PLOT_DATA[,"GENE"], NA)
     ###^^^^^^^^^^^^^^^^^^^^^^^^^^
     
     ###################################################
@@ -331,8 +339,8 @@ for (comp in 1:1) {
       # geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP2_NAME,"_(N:",length(GROUP2_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#4268F4") +
       # geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP1_NAME,"_(N:",length(GROUP1_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#303030") +
       
-      geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP2_NAME,show.legend = F,size=10, color = "#303030", check_overlap = TRUE) +
-      geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP1_NAME,show.legend = F,size=10,color = "#303030", check_overlap = TRUE) +
+      geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP2_NAME,show.legend = F,size=20, color = "#4268F4", check_overlap = TRUE) +
+      geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP1_NAME,show.legend = F,size=20,color = "#4268F4", check_overlap = TRUE) +
       
       xlim(c(L2FC_MIN,L2FC_MAX))+
       scale_color_manual(values = c("grey50","#FF3158","#4268F4","#42B858"),breaks = c(0,1,2,3,4)) +
@@ -366,7 +374,7 @@ for (comp in 1:1) {
       scale_size_manual(values = c(0,1,2,3,4),breaks = c(0,1,2,3,4)) +
       #geom_text_repel(aes(x = G1_BE_VS_SQ_Like_Nuclei_DIFF, y = PVAL,label = SIG_GENES)) +
       # ggtitle(paste(DE_Analysis,"\n",TEST,"\nLog 2 FoldChange",sep = ""))+
-      ggtitle(paste("Genes of WNT Signaling Pathways",sep = ""))+
+      ggtitle(paste("Top 100 Significant Genes of Immune Related Pathways",sep = ""))+ #[INPUT_NEEDED]
       
       # xlab(paste(DE_Analysis,"\n Log2 Fold Change",sep="")) +
       xlab(paste("Log2 Fold Change",sep="")) +
@@ -481,7 +489,7 @@ for (comp in 1:1) {
     combined_plot <- Volcano_Plot
     
     graphics.off()
-    pdf(paste(GROUP1_NAME,"_VS_",GROUP2_NAME,"_DEG_",TEST,"_DEG_ANALYSIS_PVAL.pdf",sep=""),width = 30,height = 20) #From 30x15
+    pdf(paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_DEG_",TEST,"_DEG_ANALYSIS_PVAL.pdf",sep=""),width = 30,height = 20) #From 30x15
     # plot(ggarrange(Volcano_Plot,ggarrange(plotlist = Mean_Plot_List,ncol = 2,nrow = 2,widths = c(0.5,0.5),heights = c(0.5,0.5)),ncol = 2,nrow = 1,widths = c(0.5,0.5),heights = c(1,1)))
     plot(combined_plot)
     graphics.off()

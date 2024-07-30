@@ -24,9 +24,10 @@ install_and_load_packages <- function(cran_packages, bioc_packages) {
 cran_packages <- c("circlize", "clipr", "colorRamp2", "DT", "ggalluvial", "ggrepel", "grid", "igraph", "magick", "patchwork", "RColorBrewer", "tidyverse")
 bioc_packages <- c("ComplexHeatmap","edgeR", "fgsea", "GSEABase", "GSVA", "limma", "msigdb", "msigdbr", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
 install_and_load_packages(cran_packages, bioc_packages)
+
 #### Non-Function Way of Getting Pathway specific genes from MSIGDB----
 M <- msigdbr(species = "Mus musculus", category = "C2", subcategory = "CP")
-
+M2 <- msigdbr(species = "Mus musculus", category = "C2")
 
 ####. Finding Genes of a category of. pathway from msigdb ---- 
 Human_Hallmark <- msigdbr(species="Homo sapiens", 
@@ -51,12 +52,16 @@ wnt_genesets_mouse = msigdb_mouse %>%
   filter(grepl("WNT", gs_name, ignore.case = TRUE) | 
            grepl("WNT", gs_description, ignore.case = TRUE))
 
-#Filter Immune related pathways
-immune_pathways = msigdb_mouse %>% 
-  filter(grepl("IMMUN", gs_name, ignore.case = TRUE) )#&
-           # grepl("IMMUN", gs_description, ignore.case = TRUE))
+#Filter Immune related pathways in All Mouse Genesets
+immune_pathways_mouse = msigdb_mouse %>% 
+  filter(grepl("IMMUN", gs_name, ignore.case = TRUE) |
+           grepl("IMMUN", gs_description, ignore.case = TRUE))
 print(length(unique(immune_pathways$gs_name)))
-immune_pathways_unique <- unique(immune_pathways$gs_name)
+immune_pathways_unique <- unique(immune_pathways_mouse$gs_name)
+immune_pathways_genes_unique <- unique(immune_pathways_mouse$gene_symbol)
+
+head(immune_pathways_genes_unique)
+
 
 immune_pathways_df <- data.frame("Immune Related Pathways" = unlist(immune_pathways_unique))
 write_clip(immune_pathways_df)
