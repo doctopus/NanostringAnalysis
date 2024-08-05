@@ -7,6 +7,7 @@
 # Sample_Data <- Sample_Data %>% mutate(SlideName = gsub("BBP", "BFP", SlideName))
 # Sample_Data[, "ROI"] <-  rownames(Sample_Data)
 #Normalized counts data should be imported from the previously prepared data
+Sample_Data <- Sample_Data
 Normalized_Counts_Data <- Normalized_Counts_Data_TMM
 
 # Ensure the input files exist
@@ -155,10 +156,10 @@ for (comp in 1:1) { #[INPUT_NEEDED]
   EdgeR_Normalised_Counts_Data <- as.data.frame(edgeR_gfit[[2]])
   ###########################################################################
   GROUP1_VS_GROUP2_DE_EDGER_MEANS <- as.data.frame(cbind(rownames(EdgeR_Normalised_Counts_Data),
-                                                         GROUP1_Mean  = rowMeans(log(EdgeR_Normalised_Counts_Data[,GROUP1_SAMPLES],2),na.rm = T),
-                                                         GROUP2_Mean  = rowMeans(log(EdgeR_Normalised_Counts_Data[,GROUP2_SAMPLES],2),na.rm = T),
-                                                         MEANVAL = rowMeans(log(EdgeR_Normalised_Counts_Data[,c(GROUP2_SAMPLES,GROUP1_SAMPLES)],2),na.rm = T),
-                                                         LOG2FC = rowMeans(log(EdgeR_Normalised_Counts_Data[,GROUP1_SAMPLES],2),na.rm = T) - rowMeans(log(EdgeR_Normalised_Counts_Data[,GROUP2_SAMPLES],2),na.rm = T)
+                                     GROUP1_Mean  = rowMeans(log(EdgeR_Normalised_Counts_Data[,GROUP1_SAMPLES],2),na.rm = T),
+                                     GROUP2_Mean  = rowMeans(log(EdgeR_Normalised_Counts_Data[,GROUP2_SAMPLES],2),na.rm = T),
+                                     MEANVAL = rowMeans(log(EdgeR_Normalised_Counts_Data[,c(GROUP2_SAMPLES,GROUP1_SAMPLES)],2),na.rm = T),
+                                     LOG2FC = rowMeans(log(EdgeR_Normalised_Counts_Data[,GROUP1_SAMPLES],2),na.rm = T) - rowMeans(log(EdgeR_Normalised_Counts_Data[,GROUP2_SAMPLES],2),na.rm = T)
                                                          
   )) 
   
@@ -228,7 +229,7 @@ for (comp in 1:1) { #[INPUT_NEEDED]
   DE_Analysis = paste(COMPARE_GROUP_NAME,":",GROUP1_NAME,"_Vs_",GROUP2_NAME,sep="")
   
   
-  #### Second Loop Will Start 1040
+  #### Nested Loop Will Start
   DEG_TESTS <- c("EDGER")#,"LIMMA","TTEST")
   Df_Positive_List <- NULL
   Df_Negative_List <- NULL
@@ -294,7 +295,7 @@ for (comp in 1:1) { #[INPUT_NEEDED]
     # Milan Identify significant genes from the curated list
     PLOT_DATA[,"SIG_GENES"] <- NA
     PLOT_DATA[,"SIG_GENES"] <- ifelse(
-      PLOT_DATA[,"GENE"] %in% immune_pathways_genes_unique & #[INPUT_NEEDED] wnt_genes_mouse_test
+      PLOT_DATA[,"GENE"] %in% wnt_genes_mouse_test & #[INPUT_NEEDED] wnt_genes_mouse_test
         abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
         PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
       PLOT_DATA[,"GENE"],
@@ -310,11 +311,11 @@ for (comp in 1:1) { #[INPUT_NEEDED]
     
     ## Optional: Limit number of labeled genes to prevent overcrowding (Top 25 significant genes) #[INPUT_NEEDED] or comment out below section
     #
-    sig_genes <- PLOT_DATA[!is.na(PLOT_DATA[,"SIG_GENES"]),]
-    sig_genes <- sig_genes[order(sig_genes[,"PVAL"], decreasing = TRUE),]  # Note: decreasing = TRUE because of -log10 transformation
-    top_n <- min(100, nrow(sig_genes))
-    top_genes <- sig_genes[1:top_n, "GENE"]
-    PLOT_DATA[,"SIG_GENES"] <- ifelse(PLOT_DATA[,"GENE"] %in% top_genes, PLOT_DATA[,"GENE"], NA)
+    # sig_genes <- PLOT_DATA[!is.na(PLOT_DATA[,"SIG_GENES"]),]
+    # sig_genes <- sig_genes[order(sig_genes[,"PVAL"], decreasing = TRUE),]  # Note: decreasing = TRUE because of -log10 transformation
+    # top_n <- min(100, nrow(sig_genes))
+    # top_genes <- sig_genes[1:top_n, "GENE"]
+    # PLOT_DATA[,"SIG_GENES"] <- ifelse(PLOT_DATA[,"GENE"] %in% top_genes, PLOT_DATA[,"GENE"], NA)
     ###^^^^^^^^^^^^^^^^^^^^^^^^^^
     
     ###################################################
@@ -374,7 +375,7 @@ for (comp in 1:1) { #[INPUT_NEEDED]
       scale_size_manual(values = c(0,1,2,3,4),breaks = c(0,1,2,3,4)) +
       #geom_text_repel(aes(x = G1_BE_VS_SQ_Like_Nuclei_DIFF, y = PVAL,label = SIG_GENES)) +
       # ggtitle(paste(DE_Analysis,"\n",TEST,"\nLog 2 FoldChange",sep = ""))+
-      ggtitle(paste("Top 100 Significant Genes of Immune Related Pathways",sep = ""))+ #[INPUT_NEEDED]
+      ggtitle(paste("Top 100 Significant Genes of Immune Related Pathways in Curated Genesets",sep = ""))+ #[INPUT_NEEDED]
       
       # xlab(paste(DE_Analysis,"\n Log2 Fold Change",sep="")) +
       xlab(paste("Log2 Fold Change",sep="")) +
@@ -486,14 +487,18 @@ for (comp in 1:1) { #[INPUT_NEEDED]
     #   (Mean_Plot_List[[1]] + Mean_Plot_List[[2]] + 
     #      Mean_Plot_List[[3]] + Mean_Plot_List[[4]]) + 
     #   plot_layout(ncol = 2, widths = c(0.5, 0.5), heights = c(1, 1))
-    combined_plot <- Volcano_Plot
+    #   
+    # combined_plot <- (
+    #   (Volcano_Plot / (Mean_Plot_List[[1]] + Mean_Plot_List[[2]]))/
+    #     (Mean_Plot_List[[3]] + Mean_Plot_List[[4]])
+    #   ) +
+    #     plot_layout(ncol = 1, guides = 'collect')
     
+    combined_plot <- Volcano_Plot
     graphics.off()
     pdf(paste(output_dir, "/", GROUP1_NAME,"_VS_",GROUP2_NAME,"_DEG_",TEST,"_DEG_ANALYSIS_PVAL.pdf",sep=""),width = 30,height = 20) #From 30x15
-    # plot(ggarrange(Volcano_Plot,ggarrange(plotlist = Mean_Plot_List,ncol = 2,nrow = 2,widths = c(0.5,0.5),heights = c(0.5,0.5)),ncol = 2,nrow = 1,widths = c(0.5,0.5),heights = c(1,1)))
     plot(combined_plot)
     graphics.off()
     
   }
-  
 }

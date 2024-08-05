@@ -28,10 +28,16 @@ install_and_load_packages(cran_packages, bioc_packages)
 #### Non-Function Way of Getting Pathway specific genes from MSIGDB----
 M <- msigdbr(species = "Mus musculus", category = "C2", subcategory = "CP")
 M2 <- msigdbr(species = "Mus musculus", category = "C2")
+#Unique number of genes M
+print(length(unique(M$gene_symbol))) #1274
+print(length(unique(M$gs_name))) #29
+
+#Unique number of genes M2
+print(length(unique(M2$gene_symbol))) #17616
+print(length(unique(M2$gs_name))) #6366
 
 ####. Finding Genes of a category of. pathway from msigdb ---- 
-Human_Hallmark <- msigdbr(species="Homo sapiens", 
-                                                         category ="H")
+Human_Hallmark <- msigdbr(species="Homo sapiens", category ="H")
 MTORC1_Signaling_Pathway_Genes <- Human_Hallmark %>% dplyr::filter(gs_name =="HALLMARK_MTORC1_SIGNALING") %>% 
   dplyr::select(c("gs_name", "gene_symbol", "gs_description"))
 # install.packages("clipr")
@@ -56,11 +62,30 @@ wnt_genesets_mouse = msigdb_mouse %>%
 immune_pathways_mouse = msigdb_mouse %>% 
   filter(grepl("IMMUN", gs_name, ignore.case = TRUE) |
            grepl("IMMUN", gs_description, ignore.case = TRUE))
-print(length(unique(immune_pathways$gs_name)))
+print(length(unique(immune_pathways_mouse$gs_name)))
+print(length(unique(immune_pathways_mouse$gene_symbol)))
+
 immune_pathways_unique <- unique(immune_pathways_mouse$gs_name)
 immune_pathways_genes_unique <- unique(immune_pathways_mouse$gene_symbol)
 
 head(immune_pathways_genes_unique)
+
+#Mouse Immune Canonical C2
+immune_pathways_mouse_c2 = M2 %>% 
+  filter(grepl("IMMUN", gs_name, ignore.case = TRUE) |
+           grepl("IMMUN", gs_description, ignore.case = TRUE))
+print(length(unique(immune_pathways_mouse_c2$gs_name))) #54
+print(length(unique(immune_pathways_mouse_c2$gene_symbol))) #3341
+immune_pathways_genes_unique_c2 <- unique(immune_pathways_mouse_c2$gene_symbol)
+
+#Mouse Immune Canonical C2:CP
+immune_pathways_mouse_c2cp = M %>% 
+  filter(grepl("IMMUN", gs_name, ignore.case = TRUE) |
+           grepl("IMMUN", gs_description, ignore.case = TRUE))
+print(length(unique(immune_pathways_mouse_c2cp$gs_name)))
+print(length(unique(immune_pathways_mouse_c2cp$gene_symbol)))
+immune_pathways_genes_unique_c2cp <- unique(immune_pathways_mouse_c2cp$gene_symbol)
+
 
 
 immune_pathways_df <- data.frame("Immune Related Pathways" = unlist(immune_pathways_unique))
