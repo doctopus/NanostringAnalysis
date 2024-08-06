@@ -86,7 +86,8 @@ sentence_case <- function(name) {
   first_word <- words[1]
   if (!grepl("^[A-Z0-9]+$", first_word) && !grepl("-", first_word)) {
     # Convert the first word to sentence case
-    words[1] <- paste0(toupper(substring(first_word, 1, 1)), tolower(substring(first_word, 2)))
+    words[1] <- paste0(toupper(substring(first_word, 1, 1)), 
+                       tolower(substring(first_word, 2)))
   }
   # Join the words back into a sentence
   return(paste(words, collapse = " "))
@@ -416,12 +417,22 @@ seo <- readGeoMx(countFile = countFile,
 #Sample level QC
 # library(ggplot2)
 # library(ggalluvial)
+# Create QC Directory
+QC_DIR <- paste(output_dir, "/QC/", sep = "")
+dir.create(QC_DIR)
+
 #Visualize the data
+graphics.off()
+pdf(paste(QC_DIR, "Metadata.pdf", sep = ""), width=10, height = 10)
 plotSampleInfo(seo, column2plot =c("SlideName", "Samples", "Tumor"))
+graphics.off()
+
 plotSampleInfo(seo, column2plot =c("Samples", "Tumor")) + coord_flip()
+
 #### Gene level QC [seo_qc]----
 seo #Dim 18676x175
 names(colData(seo)) #46 Columns in ColData
+view(seo@colData)
 seo_qc <- addPerROIQC(seo, 
                       sample_fraction = 0.9, #Default
                       rm_genes =TRUE, #Default
@@ -430,7 +441,10 @@ seo_qc #Gene with low count and expression values in more than threshold (sample
 # are removed by applying the function. Dim 19948x175, so removed 14 genes
 dim(seo) 
 dim(seo_qc) #Genes not meeting the above criteria were removed 19962 > 19948 
-names(seo_qc@colData)
+
+#If any genes are getting removed, we could plot those to visualize.
+columns_of_interest <- c("SlideName")
+
 seo_qc@colData
 view(colData(seo_qc)[ , c("countOfLowEprGene", "percentOfLowEprGene", "ScanLabel", "lib_size", "tissue")])
 view(colData(seo_qc))
@@ -450,8 +464,6 @@ plotGeneQC(seo_qc)
 plotGeneQC(seo_qc, top_n=12, ordannots = "SlideName", col = SlideName, point_size = 2)
 plotGeneQC(seo_qc, top_n=12, ordannots = "Samples", col = Samples, point_size = 2)
 
-
-sapply(seo_qc@colData, class)
 #Numeric Values: AOISurfaceArea, AOINucleiCount, 
 #RawReads, AlignedReads, DeduplicatedReads, TrimmedReads, StitchedReads, 
 #SequencingSaturation, lib_size, countOfLowEprGenes, percentOfLowEprGene
@@ -461,19 +473,42 @@ sapply(seo_qc@colData, class)
 
 #Final data of this segment: seo_qc
 #### ROI level QC [seo_qc_roi]----
+names(seo_qc@colData)
+view(seo_qc@colData)
+sapply(seo_qc@colData, class)
+sapply(seo_qc@colData, is.numeric)
 
 plotROIQC(seo_qc)
 
-plotROIQC(seo_qc, x_threshold = 300, color = Samples)
+plotROIQC(seo_qc, 
+          x_threshold = 25000,
+          x_axis = "AOISurfaceArea",
+          x_lab = "AOI Surface Area",
+          # y_axis = "lib_size",
+          # y_lab = "Library Size",
+          y_axis = "RawReads",
+          y_lab = "Raw Reads",
+          y_threshold = 2.5e+06,
+          color = Samples)
 
 plotROIQC(seo_qc, 
-          x_threshold = 20000, 
+          x_threshold = 25000, 
           x_axis = "AOISurfaceArea", 
-          x_lab = "AreaSize", 
+          x_lab = "AOI Surface Area", 
           y_axis = "lib_size", 
-          y_threshold = 1e+05,
+          y_threshold = 2e+05,
           y_lab = "Library Size", 
           col = Samples)
+
+plotROIQC(seo_qc, 
+          x_threshold = 300, 
+          x_axis = "AOINucleiCount", 
+          x_lab = "AOI Nuclei Count", 
+          y_axis = "RawReads", 
+          # y_threshold = 2e+05,
+          y_lab = "Raw Reads", 
+          col = Samples)
+
 colData(seo_qc)$AOINucleiCount 
 #same as
 seo_qc@colData$AOINucleiCount
