@@ -4,7 +4,7 @@
 #Vignette partial upto data preparation: https://davislaboratory.github.io/standR/articles/standR_introduction.html
 #====
 
-##### Define Functions########################
+######## Define Functions########################
 setupProject <- function(project) {
   #Create 'project' dir if not same as name of *.Rproj dir as root/proj/io, else
   #..set root as proj dir, create io as root/io; set input_dir & output_dir vars
@@ -287,7 +287,7 @@ heatmap_func_ss <- function(Input_DF, COL_ANNOT, NoofRows, UNIT) {
   return(INPUT_DATA_HEATMAP)
 }
 
-##### Setup Project ----
+######## Setup Project ----
 ## Initiate project
 setupProject("Nanostring-LUCAT1") ; print(paste0("Working dir is: ", getwd()))
 # If any project specific override: output folder if any
@@ -298,7 +298,7 @@ cran_packages <- c("circlize", "clipr", "colorRamp2", "DT", "ggalluvial", "ggrep
 bioc_packages <- c("ComplexHeatmap","edgeR", "fgsea", "GSEABase", "GSVA", "limma", "msigdb", "msigdbr", "qusage", "SpatialExperiment", "SpatialDecon", "speckle", "standR", "vissE")
 install_and_load_packages(cran_packages, bioc_packages)
 
-#### Source & Process Input files ----
+######## Source & Process Input files ----
 #Since the data is normalized counts; can not run the DESeq2 Pipeline
 #So resorting to Limma Voom. Pipeline. Install edgeR, that installs limma as a dependency
 
@@ -308,8 +308,6 @@ getwd()
 file_samplesheet<-paste0(input_dir,"/samplesheet.csv")
 file_source<-paste0(input_dir,"/LUCAT1 KD Initial Dataset .xlsx")
 
-
-######## Source & Process Input files ----
 #Getting the Collected GeneSet of Interest from Excel List
 geneList <- readxl::read_excel(file_gene_of_interest, col_names = FALSE, sheet = "Sheet1")
 genesWithNa <- as.vector(as.matrix(geneList))
@@ -324,6 +322,7 @@ Sample_Data<-read.csv(file = file_samplesheet,
                       stringsAsFactors = FALSE, #Made false to keep it as character
                       check.names = FALSE,
                       row.names = "TargetName")
+
 # sampleAnnoFile from SegmentProperties sheet
 # countFile & featureAnnoFile from BioProbeCountMatrix sheet
 #### sampleAnnoFile----
@@ -614,8 +613,8 @@ set.seed(100)
 seoPCA <-  scater::runPCA(seo_qc_roi)
 #runPCA adds reducedDimNames PCA
 pca_results <-  reducedDim(seoPCA, "PCA")
-drawPCA(seoPCA, precomputed = pca_results, col = tissue)
-drawPCA(seoPCA, precomputed = pca_results, col = SlideName)
+drawPCA(seoPCA, precomputed = pca_results, col = Tumor)
+drawPCA(seoPCA, precomputed = pca_results, col = Samples)
 
 #Draw PCA Scree Plot
 plotScreePCA(seo_qc_roi, precomputed = pca_results)
@@ -624,8 +623,8 @@ plotPairPCA(seo_qc_roi, col= tissue, precomputed = pca_results, n_dimension = 4)
 plotPairPCA(seo_qc_roi, col= SlideName, precomputed = pca_results, n_dimension = 4)
 
 #Plot Multidimensional Scaling (MDS) plot
-standR::plotMDS(seo_qc_roi, assay = 2, color = SlideName)
-standR::plotMDS(seo_qc_roi, assay = 2, color = tissue)
+standR::plotMDS(seo_qc_roi, assay = 2, color = Samples)
+standR::plotMDS(seo_qc_roi, assay = 2, color = Tumor)
 
 
 #UMAP
@@ -633,11 +632,123 @@ set.seed(100)
 
 seoUMAP <- scater::runUMAP(seoPCA, dimred = "PCA")
 #runUMAP adds one more reducedDimNames UMAP
-plotDR(seoUMAP, dimred = "UMAP", col = tissue)
-plotDR(seoUMAP, dimred = "UMAP", col = SlideName)
+plotDR(seoUMAP, dimred = "UMAP", col = Samples)
+plotDR(seoUMAP, dimred = "UMAP", col = Tumor)
 
 names(seoUMAP@metadata)
 
+######## ↓ ↓ Q3 Normalization and Saving Data [seoUMAP -> seoUMAP_Normalized_Q3] ----
+# Input: seoUMAP; output: seoUMAP_Normalized_Q3
+#Make Count Data from Source seoUMAP----
+Counts_Data <- as.data.frame(counts(seoUMAP))
+##(SKIP IF NOT SAVING Count Data)Generate a Gene Column for Data Saving ----
+Counts_Data <- as.data.frame(cbind(Gene=rownames(Counts_Data), Counts_Data))
+write.table(Counts_Data, paste(output_dir, "_Counts.txt", sep=""), 
+            sep="\t", row.names = F, col.names = T, quote = T)
+#Read Data
+Counts_Data <- read.delim(paste(output_dir, "_Counts.txt", sep=""), 
+                          sep="\t", header = T, check.names = F, stringsAsFactors = F)
+#Assign the rownames back as Genes
+rownames(Counts_Data) <- Counts_Data[,"Gene"]
+#Remove the Gene Column to make original counts
+Counts_Data[,"Gene"] <- NULL
+##(SKIP ENDS)
+#### Add Normalized Data to logcounts field----
+NORMALIZATION <- "upperquartile"
+
+seoUMAP_Normalized_Q3 <- geomxNorm(seoUMAP, method=NORMALIZATION, log = T)
+
+names(seoUMAP_Normalized_Q3@metadata) #Added "norm.method" and "norm.factor" to metadata
+seoUMAP_Normalized_Q3@metadata$norm.method
+seoUMAP_Normalized_Q3@metadata$norm.factor
+
+plotRLExpr(seoUMAP_Normalized_Q3, assay = 2, color = Samples) + ggtitle("Q3 Normalized")
+plotRLExpr(seoUMAP_Normalized_Q3, assay = 2, color = Tumor) + ggtitle("Q3 Normalized")
+##Make Normalized Count Data ----
+
+Normalized_Counts_Data_Q3 <- as.data.frame(logcounts(seoUMAP_Normalized_Q3))
+
+##(SKIP IF NOT SAVING Normalized Count Data)Generate a Gene Column for Data Saving ----
+Normalized_Counts_Data_Q3 <- as.data.frame(cbind(Gene=rownames(Normalized_Counts_Data), Normalized_Counts_Data))
+write.table(Normalized_Counts_Data_Q3, paste(output_dir, NORMALIZATION, "_Normalized_Counts.txt", sep=""), 
+            sep="\t", row.names = F, col.names = T, quote = T)
+#Read Data
+Normalized_Counts_Data_Q3 <- read.delim(paste(output_dir, NORMALIZATION, "_Normalized_Counts.txt", sep=""), 
+                                        sep="\t", header = T, check.names = F, stringsAsFactors = F)
+#Assign the rownames back as Genes
+rownames(Normalized_Counts_Data_Q3) <- Normalized_Counts_Data_Q3[,"Gene"]
+
+#Remove the Gene Column to make original normalized counts
+Normalized_Counts_Data_Q3[,"Gene"] <- NULL
+##(SKIP ENDS)
+##Make Feature Data ----
+Feature_Data <- as.data.frame(rowData(seoUMAP_Normalized_Q3))
+#Skip if not saving
+# Feature_Data <- as.data.frame(cbind(Gene=rownames(Feature_Data), Feature_Data))
+##Make Sample Data ----
+Sample_Data <- as.data.frame(colData(seoUMAP_Normalized_Q3))
+#Skip if not saving
+#Sample_Data <- as.data.frame(cbind(ROI=rownames(Sample_Data), Sample_Data))
+
+
+#↑ ↑ Q3 Normalization End~~~~~~~~~~~~~~~~~~
+
+######## ↓ ↓ TMM Normalization and Saving Data [seoUMAP -> seoUMAP_Normalized_TMM]----
+# Input: seoUMAP output: seoUMAP_Normalized_TMM
+#Data has become seoUMAP now with addition of two reducedDimNames PCA and UMAP
+#names(seoUMAP@metadata)
+NORMALIZATION_METHOD <- "TMM"
+seoUMAP_Normalized_TMM <- geomxNorm(seoUMAP, method = NORMALIZATION_METHOD, log = TRUE) #TMM Normalization
+#geomxNorm Adds two more items to metadata: norm.factor, norm.method
+
+#names(seoUMAP_Normalized_TMM@metadata)
+plotRLExpr(seoUMAP_Normalized_TMM, assay = 2, color = Samples) + ggtitle("TMM Normalized")
+plotRLExpr(seoUMAP_Normalized_TMM, assay = 2, color = Tumor) + ggtitle("TMM Normalized")
+
+seoUMAP_Normalized_TMM@metadata$norm.method
+seoUMAP_Normalized_TMM@metadata$norm.factor
+#Make Count Data from Source seoUMAP----
+Counts_Data <- as.data.frame(counts(seoUMAP))
+#Make Normalized Count from TMM----
+Normalized_Counts_Data_TMM <- as.data.frame(logcounts(seoUMAP_Normalized_TMM))
+
+###Make Sample Data -Same from Q3 or TMM File----
+Sample_Data <- as.data.frame(colData(seoUMAP_Normalized_TMM))
+##Make Feature Data ----
+Feature_Data <- as.data.frame(rowData(seoUMAP_Normalized_TMM))
+##↓↓~~~~~~~~~~~~~~~~~~~~~
+
+####LOOP Plot QC Figures in Loop----
+names(seo_qc_roi@colData)
+#Inputs seoUMAP_Normalized_TMM, seoUMAP_Normalized_Q3 & gmt files in input/MSIG_DB
+ROI_ANNOTATION_COLS <- c("SlideName", "Samples", "Tumor")
+dictionary <- c(TMM=seoUMAP_Normalized_TMM, Q3=seoUMAP_Normalized_Q3) #seoUMAP_Normalized_TMM (for TMM) or seoUMAP_Normalized_Q3 (for Q3)
+# eval(GRP)
+i = 1
+NORM = "TMM" #[INPUT_NEEDED] TMM or Q3 for naming the plots and files
+
+for(i in 1:length(ROI_ANNOTATION_COLS)){
+  GRP <- ROI_ANNOTATION_COLS[[i]]
+  print(GRP)
+  set.seed(100)
+  RLE_PLOT <- plotRLExpr(dictionary[[NORM]], assay = 2, ordannots=GRP, color=get(GRP)) + ggtitle(paste(NORM, GRP, "RLE")) + labs(color=GRP)
+  PAIRWISE_PCA <- plotPairPCA(dictionary[[NORM]], title=GRP, col = get(GRP), shape = get(GRP), assay=2, n_dimension=2) + labs(color=GRP, shape=GRP)
+  PCA_BI_PLOT <- plotPCAbiplot(dictionary[[NORM]], n_loadings=10, assay=2, col=get(GRP)) + labs(color=GRP)
+  MultiDIM_SCALING_PLOT <- standR::plotMDS(dictionary[[NORM]], assay=2, col=get(GRP), shape=get(GRP)) + labs(color=GRP, shape=GRP)
+  UMAP <- plotDR(dictionary[[NORM]], dimred="UMAP", col=get(GRP)) + labs(color=GRP)
+  PCA_SCREE_PLOT <- plotScreePCA(dictionary[[NORM]], assay=2, dims=10)
+  
+  graphics.off() #Set up the PDF output
+  pdf(paste(output_dir,"/", NORM, "_NORMALIZED_", GRP, ".pdf", sep = ""), width=15, height=20)
+  combined_plot <- (
+    (RLE_PLOT / PAIRWISE_PCA) /
+      (PCA_BI_PLOT + MultiDIM_SCALING_PLOT + UMAP) / PCA_SCREE_PLOT
+  ) +
+    plot_layout(ncol = 1, guides = 'collect')
+  
+  print(combined_plot) #Print the combined plot to the PDF
+  graphics.off() # Close the PDF device
+}
 
 
 
