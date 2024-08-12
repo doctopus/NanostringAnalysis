@@ -141,8 +141,8 @@ heatmap_func_ss <- function(Input_DF,COL_ANNOT, NoofRows){
   Color_Set2 <- Color_Sets[[2]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Neuron"]),"Neuron"])))]
   names(Color_Set2) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Neuron"]),"Neuron"])
   
-  Color_Set3 <- Color_Sets[[3]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"tissue"]),"tissue"])))]
-  names(Color_Set3) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"tissue"]),"tissue"])
+  Color_Set3 <- Color_Sets[[3]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Tissue"]),"Tissue"])))]
+  names(Color_Set3) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Tissue"]),"Tissue"])
   
   Color_Set4 <- Color_Sets[[4]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"CD45"]),"CD45"])))]
   names(Color_Set4) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"CD45"]),"CD45"])
@@ -151,11 +151,11 @@ heatmap_func_ss <- function(Input_DF,COL_ANNOT, NoofRows){
   
   HEATMAP_ANNOTAION <- HeatmapAnnotation(ScanLabel=as.character(Heatmap_Annotation_Data[,"ScanLabel"]),
                                          Neuron=as.character(Heatmap_Annotation_Data[,"Neuron"]),
-                                         tissue=as.character(Heatmap_Annotation_Data[,"tissue"]),
+                                         Tissue=as.character(Heatmap_Annotation_Data[,"Tissue"]),
                                          CD45=as.character(Heatmap_Annotation_Data[,"CD45"]),
                                          col = list(ScanLabel=Color_Set1,
                                                     Neuron=Color_Set2,
-                                                    tissue=Color_Set3,
+                                                    Tissue=Color_Set3,
                                                     CD45=Color_Set4))
   
   
@@ -231,8 +231,10 @@ sampleAnnoFile <- pre_sampleAnnoFile %>%
   mutate_at(6:18, ~ as.logical(.)) %>% 
   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
+#Rename the tissue column as Tissue
+names(sampleAnnoFile)[names(sampleAnnoFile)=="tissue"] <- "Tissue"
+
 # write.table(sampleAnnoFile, "output/sampleAnnoFile.txt", sep = "\t", row.names = FALSE, col.names = TRUE)
-# duplicates <- c('D830030K20Rik', 'Gm10406', 'LOC118568634')
  
 #### featureAnnoFile----
 #BioProbeCountMatrix Worksheet: TargetName is default column
@@ -429,7 +431,7 @@ rowData(seo)[1:5,1:5]
 #WTA has NegProbe-WTX data. Ensure that there are no duplicate gene names in the TargetName column
 metadata(seo)$NegProbes[,1:5]
 colData(seo)$QCFlags
-colData(seo)$tissue
+colData(seo)$Tissue
 names(seo@colData)
 
 ######## QC Steps ---- 
@@ -437,8 +439,8 @@ names(seo@colData)
 # library(ggplot2)
 # library(ggalluvial)
 #Visualize the data
-plotSampleInfo(seo, column2plot =c("SlideName", "tissue", "Neuron", "CD45"))
-plotSampleInfo(seo, column2plot =c("SlideName", "tissue")) + coord_flip()
+plotSampleInfo(seo, column2plot =c("SlideName", "Tissue", "Neuron", "CD45"))
+plotSampleInfo(seo, column2plot =c("SlideName", "Tissue")) + coord_flip()
 #### Gene level QC [seo_qc]----
 seo #Dim 19962x175
 names(colData(seo)) #46 Columns in ColData
@@ -452,7 +454,7 @@ dim(seo)
 dim(seo_qc) #Genes not meeting the above criteria were removed 19962 > 19948 
 names(seo_qc@colData)
 seo_qc@colData
-view(colData(seo_qc)[ , c("countOfLowEprGene", "percentOfLowEprGene", "ScanLabel", "lib_size", "tissue")])
+view(colData(seo_qc)[ , c("countOfLowEprGene", "percentOfLowEprGene", "ScanLabel", "lib_size", "Tissue")])
 view(colData(seo_qc))
 
 length(seo@metadata$genes_rm_rawCount) #0
@@ -468,7 +470,7 @@ metadata(seo) |>names()
 # plotGeneQC(seo_qc, ordannots = "regions", col = regions, point_size = 2)
 plotGeneQC(seo_qc)
 plotGeneQC(seo_qc, top_n=12, ordannots = "SlideName", col = SlideName, point_size = 2)
-plotGeneQC(seo_qc, top_n=12, ordannots = "tissue", col = tissue, point_size = 2)
+plotGeneQC(seo_qc, top_n=12, ordannots = "Tissue", col = Tissue, point_size = 2)
 plotGeneQC(seo_qc, top_n =12, ordannots = "NF-H-_CD45-_Edge_Gland", col = 'NF-H-_CD45-_Edge_Gland', point_size = 2 )
 
 sapply(seo_qc@colData, class)
@@ -494,8 +496,8 @@ view(seo_qc@colData)
 qc_keep <- colData(seo_qc)$AOINucleiCount > 150 &
   colData(seo_qc)$RawReads > 1e+06 &
   colData(seo_qc)$SlideName != 'TR' &
-  colData(seo_qc)$tissue != 'tumor_edge_with_gland' &
-  colData(seo_qc)$tissue != 'tumor_gland' &
+  colData(seo_qc)$Tissue != 'tumor_edge_with_gland' &
+  colData(seo_qc)$Tissue != 'tumor_gland' &
   colData(seo_qc)$AlignedReads > 80 &
   colData(seo_qc)$TrimmedReads > 80 &
   colData(seo_qc)$StitchedReads > 80 &
@@ -546,7 +548,7 @@ plotROIQC(seo_qc_roi,
           x_threshold = 1e+06, 
           y_axis = "AOISurfaceArea",
           y_lab = "AOISurfaceArea",
-          col = tissue)
+          col = Tissue)
 
 plotROIQC(seo_qc_roi,
           x_axis = "RawReads",
@@ -585,13 +587,13 @@ plotRLExpr(seo) #RLE of raw count
 plotRLExpr(seo_qc_roi)
 #Remove the technical variations due to the library size differences
 plotRLExpr(seo_qc_roi, ordannots = "SlideName", assay = 2, color = SlideName)+ ggtitle("Post QC Data")
-#can also plot by tissue type or other classification
-plotRLExpr(seo_qc_roi, ordannots = "tissue", assay = 2, color = tissue)+ ggtitle("Post QC Data")
+#can also plot by Tissue type or other classification
+plotRLExpr(seo_qc_roi, ordannots = "Tissue", assay = 2, color = Tissue)+ ggtitle("Post QC Data")
 
 ######## Dimentionality Reduction [seoPCA->seoUMAP]----
 #seo_qc_roi@assays #Assay 2 is based on logcounts
 # BiocManager::install("scater")
-drawPCA(seo_qc_roi, assay = 2, color = tissue) # however since the pca will change axis every time we plot, 
+drawPCA(seo_qc_roi, assay = 2, color = Tissue) # however since the pca will change axis every time we plot, 
 #We can save the data to analyze it the same way every time
 drawPCA(seo_qc_roi, assay =2, color = SlideName)
 #To make it reproducible
@@ -600,18 +602,18 @@ set.seed(100)
 seoPCA <-  scater::runPCA(seo_qc_roi)
 #runPCA adds reducedDimNames PCA
 pca_results <-  reducedDim(seoPCA, "PCA")
-drawPCA(seoPCA, precomputed = pca_results, col = tissue)
+drawPCA(seoPCA, precomputed = pca_results, col = Tissue)
 drawPCA(seoPCA, precomputed = pca_results, col = SlideName)
 
 #Draw PCA Scree Plot
 plotScreePCA(seo_qc_roi, precomputed = pca_results)
 #Plot Pair PCA
-plotPairPCA(seo_qc_roi, col= tissue, precomputed = pca_results, n_dimension = 4)
+plotPairPCA(seo_qc_roi, col= Tissue, precomputed = pca_results, n_dimension = 4)
 plotPairPCA(seo_qc_roi, col= SlideName, precomputed = pca_results, n_dimension = 4)
 
 #Plot Multidimensional Scaling (MDS) plot
 standR::plotMDS(seo_qc_roi, assay = 2, color = SlideName)
-standR::plotMDS(seo_qc_roi, assay = 2, color = tissue)
+standR::plotMDS(seo_qc_roi, assay = 2, color = Tissue)
 
 
 #UMAP
@@ -619,7 +621,7 @@ set.seed(100)
 
 seoUMAP <- scater::runUMAP(seoPCA, dimred = "PCA")
 #runUMAP adds one more reducedDimNames UMAP
-plotDR(seoUMAP, dimred = "UMAP", col = tissue)
+plotDR(seoUMAP, dimred = "UMAP", col = Tissue)
 plotDR(seoUMAP, dimred = "UMAP", col = SlideName)
 
 names(seoUMAP@metadata)
@@ -648,7 +650,7 @@ seoUMAP_Normalized_Q3 <- geomxNorm(seoUMAP, method=NORMALIZATION, log = T)
 names(seoUMAP_Normalized_Q3@metadata) #Added "norm.method" and "norm.factor" to metadata
 seoUMAP_Normalized_Q3@metadata$norm.method
 
-plotRLExpr(seoUMAP_Normalized_Q3, assay = 2, color = tissue) + ggtitle("Q3 Normalized")
+plotRLExpr(seoUMAP_Normalized_Q3, assay = 2, color = Tissue) + ggtitle("Q3 Normalized")
 plotRLExpr(seoUMAP_Normalized_Q3, assay = 2, color = SlideName) + ggtitle("Q3 Normalized")
 ##Make Normalized Count Data ----
 Normalized_Counts_Data_Q3 <- as.data.frame(logcounts(seoUMAP_Normalized_Q3))
@@ -687,7 +689,7 @@ seoUMAP_Normalized_TMM <- geomxNorm(seoUMAP, method = NORMALIZATION_METHOD) #TMM
 #geomxNorm Adds two more items to metadata: norm.factor, norm.method
 
 #names(seoUMAP_Normalized_TMM@metadata)
-plotRLExpr(seoUMAP_Normalized_TMM, assay = 2, color = tissue) + ggtitle("TMM Normalized")
+plotRLExpr(seoUMAP_Normalized_TMM, assay = 2, color = Tissue) + ggtitle("TMM Normalized")
 plotRLExpr(seoUMAP_Normalized_TMM, assay = 2, color = SlideName) + ggtitle("TMM Norrmalized")
 #Make Count Data from Source seoUMAP----
 Counts_Data <- as.data.frame(counts(seoUMAP))
@@ -701,7 +703,7 @@ Feature_Data <- as.data.frame(rowData(seoUMAP_Normalized_TMM))
 ##↓↓~~~~~~~~~~~~~~~~~~~~~
 ####LOOP Plot QC Figures in Loop----
 #Inputs seoUMAP_Normalized_TMM, seoUMAP_Normalized_Q3 & gmt files in input/MSIG_DB
-ROI_ANNOTATION_COLS <- c("SlideName", "Neuron", "tissue", "CD45")
+ROI_ANNOTATION_COLS <- c("SlideName", "Neuron", "Tissue", "CD45")
 dictionary <- c(TMM=seoUMAP_Normalized_TMM, Q3=seoUMAP_Normalized_Q3) #seoUMAP_Normalized_TMM (for TMM) or seoUMAP_Normalized_Q3 (for Q3)
 # eval(GRP)
 i = 1
@@ -793,7 +795,7 @@ for (geneset in 1:length(GeneSets)){
   rownames(Input_DF) <- sapply(rownames(Input_DF),function(x) gsub("WP_","",as.character(x)))
   ###########################
   COL_ANNOT <- NULL
-  COL_ANNOT = Sample_Data[,c("ROI","ScanLabel","Neuron","tissue","CD45")]
+  COL_ANNOT = Sample_Data[,c("ROI","ScanLabel","Neuron","Tissue","CD45")]
   COL_ANNOT[,"Group"] <- COL_ANNOT[,"ScanLabel"]
   rownames(COL_ANNOT) <- COL_ANNOT[,"ROI"]
   COL_ANNOT[,"ROI"] <- NULL
@@ -823,7 +825,7 @@ for (geneset in 1:length(GeneSets)){
 seoUMAP_Normalized_TMM <- scater::runPCA(seoUMAP_Normalized_TMM) #Adds pca data to reducedDim
 pca_results_tmm <- reducedDim(seoUMAP_Normalized_TMM, "PCA")
 plotPairPCA(seoUMAP_Normalized_TMM, precomputed = pca_results_tmm, color = SlideName)
-plotPairPCA(seoUMAP_Normalized_TMM, precomputed = pca_results_tmm, color = tissue)
+plotPairPCA(seoUMAP_Normalized_TMM, precomputed = pca_results_tmm, color = Tissue)
 
 #### Batch Correction[seoNCG_TMM]####----
 #Input: seoUMAP_Normalized_TMM/seoUMAP_Normalized_Q3 -> Output: seoNCG_TMM/seoNCG_Q3
@@ -839,7 +841,7 @@ names(seoNCG_TMM@metadata)
 names(seoNCG_TMM@assays)
 seoUMAP@colData$Neuron
 seoUMAP@colData$SlideName
-seoUMAP@colData$tissue
+seoUMAP@colData$Tissue
 
 # Use RUV4 (remove unwanted variation 4) which requires NCG data to normalize using geomxBatchCorrection
 # RUV4 requires : factors of interest, NCGs, Number of unwanted factors to use; smallest number where technical variations no longer exist
@@ -851,7 +853,7 @@ seoUMAP@colData$tissue
 # Input seoNCG_TMM -> seoBatch_TMM -> spe_TMM
 #To plot all pairPCAs together
 for(i in seq(5)){
-  seoBatch_TMM <- geomxBatchCorrection(seoNCG_TMM, factors = "Neuron", #Or use other variables like tissue, Neuron, SlideName
+  seoBatch_TMM <- geomxBatchCorrection(seoNCG_TMM, factors = "Neuron", #Or use other variables like Tissue, Neuron, SlideName
                                   NCGs = metadata(seoNCG_TMM)$NCGs, k = i)
   
   print(plotPairPCA(seoBatch_TMM, assay = 2, n_dimension = 4, color = Neuron, title = paste0("k = ", i)))
@@ -870,7 +872,7 @@ print(plotPairPCA(seoBatch_TMM, assay = 2, n_dimension = 4, color = Neuron,
 
 ####Add the Batch Correction data [spe_TMM]----
 #Using that k value make the seoBatch_TMM object final, and replace the PCA data with a new PCA
-seoBatch_TMM <- geomxBatchCorrection(seoNCG_TMM, factors = "Neuron",  #Select any factor of biological interest such as tissue or Neuron
+seoBatch_TMM <- geomxBatchCorrection(seoNCG_TMM, factors = "Neuron",  #Select any factor of biological interest such as Tissue or Neuron
                                 NCGs = metadata(seoNCG_TMM)$NCGs, k = 2)
 set.seed(100)
 seoBatch_TMM <- scater::runPCA(seoBatch_TMM) #update seoBatch_TMM with new PCA data
@@ -920,7 +922,7 @@ write.table(contr.matrix,paste(output_dir, "/",GROUP1_NAME,"_VS_",GROUP2_NAME,"_
 #   #Sample Data
 #   Experiment_Sample_Data <- Sample_Data
 #   # Experiment_Sample_Data[, "ROI"] <-  rownames(Experiment_Sample_Data)
-#   Comparision_Sample_Data <- Experiment_Sample_Data[,c("ROI", "ScanLabel","Neuron","tissue","CD45")]
+#   Comparision_Sample_Data <- Experiment_Sample_Data[,c("ROI", "ScanLabel","Neuron","Tissue","CD45")]
 #   Comparision_Sample_Data[,"Group"] <- Experiment_Sample_Data[,COMPARE_GROUP_NAME]
 #   print(table(Comparision_Sample_Data[,"Group"]))
 #   
@@ -1413,10 +1415,10 @@ colnames(colData(spe_TMM))
 names(metadata(spe_TMM))
 
 #Adding W matrices resulting from RUV4 to the model matrix as covariates to use the batch corrected data
-design <- model.matrix(~0 + Neuron + ruv_W1 + ruv_W2, data = colData(spe_TMM)) #Select Any factor for comparison like tissue, Neuron, or SlideName
+design <- model.matrix(~0 + Neuron + ruv_W1 + ruv_W2, data = colData(spe_TMM)) #Select Any factor for comparison like Tissue, Neuron, or SlideName
 colnames(design)
 #Rename by removing the tissue prefix
-# colnames(design) <- gsub("^tissue", "", colnames(design))
+# colnames(design) <- gsub("^Tissue", "", colnames(design))
 colnames(design) <- gsub("^Neuron", "", colnames(design))
 colnames(design) <- gsub("-H\\+", "H_POS", colnames(design))
 colnames(design) <- gsub("-H\\-", "H_NEG", colnames(design))
@@ -1592,10 +1594,10 @@ countData <- as.data.frame(counts(spe_TMM))
 str(countData)
 
 colData <- as.data.frame(spe_TMM@colData@listData)
-colData <- colData %>% dplyr::select(c("SlideName", "Neuron", "tissue", "CD45"))
+colData <- colData %>% dplyr::select(c("SlideName", "Neuron", "Tissue", "CD45"))
 
-colData <- colData %>% mutate(tissue = str_to_sentence(tissue))
-colData <- colData %>% rename(Tissue = tissue)
+colData <- colData %>% mutate(Tissue = str_to_sentence(Tissue))
+colData <- colData %>% rename(Tissue = Tissue)
 colData[,"Neuron"] <- sapply(colData[,"Neuron"], function(x) gsub("-H\\+", "H_POS", as.character(x)))
 colData[,"Neuron"] <- sapply(colData[,"Neuron"], function(x) gsub("-H\\-", "H_NEG", as.character(x)))
 colData[,"CD45"] <- sapply(colData[,"CD45"], function(x) gsub("\\-", "_NEG", as.character(x)))

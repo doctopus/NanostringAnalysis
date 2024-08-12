@@ -133,8 +133,8 @@ heatmap_func_ss_old <- function(Input_DF,COL_ANNOT, NoofRows){
                      # brewer.pal(12,"Dark2")
   )
   
-  Color_Set1 <- Color_Sets[[1]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Sample"]),"Sample"])))]
-  names(Color_Set1) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Sample"]),"Sample"])
+  Color_Set1 <- Color_Sets[[1]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Samples"]),"Samples"])))]
+  names(Color_Set1) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Samples"]),"Samples"])
   
   Color_Set2 <- Color_Sets[[2]][c(1:length(as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Tumor"]),"Tumor"])))]
   names(Color_Set2) <- as.character(Heatmap_Annotation_Data[!duplicated(Heatmap_Annotation_Data[,"Tumor"]),"Tumor"])
@@ -153,7 +153,7 @@ heatmap_func_ss_old <- function(Input_DF,COL_ANNOT, NoofRows){
   
   
   
-  HEATMAP_ANNOTAION <- HeatmapAnnotation(Sample=as.character(Heatmap_Annotation_Data[,"Sample"]),
+  HEATMAP_ANNOTAION <- HeatmapAnnotation(Sample=as.character(Heatmap_Annotation_Data[,"Samples"]),
                                          Tissue=as.character(Heatmap_Annotation_Data[,"Tumor"]),
                                          # tissue=as.character(Heatmap_Annotation_Data[,"tissue"]),
                                          # CD45=as.character(Heatmap_Annotation_Data[,"CD45"]),
@@ -721,11 +721,11 @@ Feature_Data <- as.data.frame(rowData(seoUMAP_Normalized_TMM))
 ####LOOP Plot QC Figures in Loop----
 names(seo_qc_roi@colData)
 #Inputs seoUMAP_Normalized_TMM, seoUMAP_Normalized_Q3 & gmt files in input/MSIG_DB
-ROI_ANNOTATION_COLS <- c("SlideName", "Samples", "Tumor")
+ROI_ANNOTATION_COLS <- c("Sample", "Samples", "Tumor")
 dictionary <- c(TMM=seoUMAP_Normalized_TMM, Q3=seoUMAP_Normalized_Q3) #seoUMAP_Normalized_TMM (for TMM) or seoUMAP_Normalized_Q3 (for Q3)
 # eval(GRP)
 i = 1
-NORM = "TMM" #[INPUT_NEEDED] TMM or Q3 for naming the plots and files
+NORM = "Q3" #[INPUT_NEEDED] TMM or Q3 for naming the plots and files
 
 for(i in 1:length(ROI_ANNOTATION_COLS)){
   GRP <- ROI_ANNOTATION_COLS[[i]]
@@ -760,6 +760,7 @@ for(i in 1:length(ROI_ANNOTATION_COLS)){
 # library("colorRamp2")
 # BiocManager::install("qusage")
 # library("qusage")
+Normalized_Counts_Data <- Normalized_Counts_Data_TMM
 
 MSIG_DB <- paste0(input_dir, "/MSIG_DB/")
 GeneSets <- list.files(MSIG_DB, pattern= "*.gmt", full.names = F)
@@ -822,10 +823,10 @@ for (geneset in 1:length(GeneSets)){
   ##########################
   No_Of_Rows = 100
   # UNIT = geneset_name
-  UNIT = get("MSigDB_Dictionary")[geneset_name]
+  UNIT = get("MSigDB_Dictionary")[[geneset_name]]
   #########################3
   
-  ssGSEA_Heatmap <- heatmap_func_ss(Input_DF,COL_ANNOT,100, UNIT) #*NEW from last analsysis, added UNIT, improved the function
+  ssGSEA_Heatmap <- heatmap_func_ss(Input_DF,COL_ANNOT,100) #*NEW from last analsysis, added UNIT, improved the function
   
   #NCOLS = as.character(length(Heatmap_Data[,1]))
   #NROWS = as.character(length(Heatmap_Data[1,]))
