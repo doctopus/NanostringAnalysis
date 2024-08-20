@@ -24,8 +24,8 @@ COMPARE_TABLE <- as.data.frame(cbind(
           GROUP1_NAME=c("Sympa","FP", "IBTP", "Sympa_NF_H_POS","FP_NF_H_POS","Sympa_NF_H_POS","Sympa_NF_H_NEG"),
           GROUP2_NAME=c("FP","BBP", "Sympa","Sympa_NF_H_NEG","FP_NF_H_NEG","FP_NF_H_POS","FP_NF_H_NEG")))
 
-comp =1 #[INPUT_NEEDED]
-for (comp in 1:1) { #[INPUT_NEEDED]
+comp =2 #[INPUT_NEEDED]
+for (comp in 2:2) { #[INPUT_NEEDED]
   print (comp)
   COMPARE_GROUP_NAME = COMPARE_TABLE[comp,"COMPARE_GROUP_NAME"] 
   GROUP1_NAME = COMPARE_TABLE[comp,"GROUP1_NAME"] 
@@ -35,7 +35,7 @@ for (comp in 1:1) { #[INPUT_NEEDED]
   #Sample Data
   Experiment_Sample_Data <- Sample_Data
   Experiment_Sample_Data[, "ROI"] <-  rownames(Experiment_Sample_Data)
-  Comparision_Sample_Data <- Experiment_Sample_Data[,c("ROI", "ScanLabel","Neuron","tissue","CD45")]
+  Comparision_Sample_Data <- Experiment_Sample_Data[,c("ROI", "ScanLabel","Neuron","Tissue","CD45")]
   Comparision_Sample_Data[,"Group"] <- Experiment_Sample_Data[,COMPARE_GROUP_NAME]
   print(table(Comparision_Sample_Data[,"Group"]))
   
@@ -295,7 +295,7 @@ for (comp in 1:1) { #[INPUT_NEEDED]
     # Milan Identify significant genes from the curated list
     PLOT_DATA[,"SIG_GENES"] <- NA
     PLOT_DATA[,"SIG_GENES"] <- ifelse(
-      PLOT_DATA[,"GENE"] %in% wnt_genes_mouse_test & #[INPUT_NEEDED] wnt_genes_mouse_test
+      PLOT_DATA[,"GENE"] %in% immune_pathways_genes_unique_c2 & #[INPUT_NEEDED] wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique
         abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
         PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
       PLOT_DATA[,"GENE"],
@@ -309,8 +309,8 @@ for (comp in 1:1) { #[INPUT_NEEDED]
     #                                 PLOT_DATA[,"PVAL"] > pval_threshold,
     #                               "Highlighted", "Not Highlighted")
     
-    ## Optional: Limit number of labeled genes to prevent overcrowding (Top 25 significant genes) #[INPUT_NEEDED] or comment out below section
-    #
+    ## Optional: Limit number of labeled genes to prevent overcrowding (Top 100 significant genes) #[INPUT_NEEDED] or comment out below section
+    ###^^^^^^^^^^^^^^^^^^^^^^^^^^
     # sig_genes <- PLOT_DATA[!is.na(PLOT_DATA[,"SIG_GENES"]),]
     # sig_genes <- sig_genes[order(sig_genes[,"PVAL"], decreasing = TRUE),]  # Note: decreasing = TRUE because of -log10 transformation
     # top_n <- min(100, nrow(sig_genes))
@@ -375,7 +375,7 @@ for (comp in 1:1) { #[INPUT_NEEDED]
       scale_size_manual(values = c(0,1,2,3,4),breaks = c(0,1,2,3,4)) +
       #geom_text_repel(aes(x = G1_BE_VS_SQ_Like_Nuclei_DIFF, y = PVAL,label = SIG_GENES)) +
       # ggtitle(paste(DE_Analysis,"\n",TEST,"\nLog 2 FoldChange",sep = ""))+
-      ggtitle(paste("Top 100 Significant Genes of Immune Related Pathways in Curated Genesets",sep = ""))+ #[INPUT_NEEDED]
+      ggtitle(paste("All significant Canonical immune related pathway genes(C2:3341)",sep = ""))+ #[INPUT_NEEDED]
       
       # xlab(paste(DE_Analysis,"\n Log2 Fold Change",sep="")) +
       xlab(paste("Log2 Fold Change",sep="")) +

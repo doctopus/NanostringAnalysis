@@ -50,14 +50,14 @@ plot_data_final[] <- lapply(plot_data_final, as.numeric)
 # Set colors manually
 color_map <- c("NF-H-" = "darkorange", "NF-H+" = "purple")
 
-# Create the spider plot
+# Plot the main radar chart with all data points but without the threshold area
 par(mar = c(2, 2, 2, 2))
 radarchart(
   plot_data_final,
-  pcol = c("forestgreen", color_map[plot_data$Neuron]),
-  pfcol = c(scales::alpha("forestgreen", 0.3), rep(NA, nrow(plot_data))),
-  plwd = c(2, rep(1, nrow(plot_data))),
-  plty = c(1, rep(1, nrow(plot_data))),
+  pcol = c(rep(NA, 2), color_map[plot_data$Neuron]),  # No lines for the max/min/threshold
+  pfcol = c(NA, NA, rep(NA, nrow(plot_data))),  # No fill for max/min/threshold
+  plwd = c(NA, NA, rep(1, nrow(plot_data))),
+  plty = c(NA, NA, rep(1, nrow(plot_data))),
   cglcol = "grey",
   cglty = 1,
   axistype = 1,
@@ -68,19 +68,28 @@ radarchart(
   seg = 5
 )
 
+# Overlay the threshold area on top of the plot
 radarchart(
-  plot_data_final,
-  cglcol = "grey"
-  # pcol = c("red", color_map[plot_data$Neuron]),
-  # pfcol = c(scales::alpha("red", 0.3), rep(NA, nrow(plot_data)))
+  plot_data_final[1:3, ],  # Select only the max, min, and threshold rows
+  pcol = c(NA, NA, "red"),  # Only plot the threshold line
+  pfcol = c(NA, NA, scales::alpha("red", 0.3)),  # Transparent fill for the threshold area
+  plwd = c(NA, NA, 2),  # Set the line width for the threshold
+  plty = c(NA, NA, 1),  # Line type for the threshold
+  cglcol = NA,  # Skip grid lines for this overlay
+  cglty = 1,
+  axistype = 1,
+  caxislabels = NA,
+  cglwd = 1,
+  vlcex = 0.8,
+  axislabcol = "black",
+  seg = 5,
+  new = FALSE  # Ensures that the plot is not cleared, overlays on the previous plot
 )
+
 # Add a legend
 legend(
-  # "bottomleft",
-  # 2.8, 19,
-  x=c(0.8, 1.04),
-  y=c(0.2, 0.3),
-  # text.width = 15,
+  x = c(0.8, 1.04),
+  y = c(0.2, 0.3),
   legend = c("Threshold", names(color_map)),
   col = c("red", color_map),
   lwd = c(2, 1, 1),
@@ -89,3 +98,6 @@ legend(
 
 # Add title
 title("QC Parameters with Thresholds on a Normalized Scale")
+
+###========
+ 

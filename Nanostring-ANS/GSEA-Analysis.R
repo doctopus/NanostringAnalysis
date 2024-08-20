@@ -62,10 +62,10 @@ wnt_genesets_mouse = msigdb_mouse %>%
 immune_pathways_mouse = msigdb_mouse %>% 
   filter(grepl("IMMUN", gs_name, ignore.case = TRUE) |
            grepl("IMMUN", gs_description, ignore.case = TRUE))
-print(length(unique(immune_pathways_mouse$gs_name)))
-print(length(unique(immune_pathways_mouse$gene_symbol)))
+print(length(unique(immune_pathways_mouse$gs_name))) #346
+print(length(unique(immune_pathways_mouse$gene_symbol))) #9427
 
-immune_pathways_unique <- unique(immune_pathways_mouse$gs_name)
+#immune_pathways_unique <- unique(immune_pathways_mouse$gs_name)
 immune_pathways_genes_unique <- unique(immune_pathways_mouse$gene_symbol)
 
 head(immune_pathways_genes_unique)
@@ -82,8 +82,8 @@ immune_pathways_genes_unique_c2 <- unique(immune_pathways_mouse_c2$gene_symbol)
 immune_pathways_mouse_c2cp = M %>% 
   filter(grepl("IMMUN", gs_name, ignore.case = TRUE) |
            grepl("IMMUN", gs_description, ignore.case = TRUE))
-print(length(unique(immune_pathways_mouse_c2cp$gs_name)))
-print(length(unique(immune_pathways_mouse_c2cp$gene_symbol)))
+print(length(unique(immune_pathways_mouse_c2cp$gs_name))) #0
+print(length(unique(immune_pathways_mouse_c2cp$gene_symbol))) #0
 immune_pathways_genes_unique_c2cp <- unique(immune_pathways_mouse_c2cp$gene_symbol)
 
 

@@ -343,10 +343,9 @@ countFile_others <- next_countFile %>%
   # mutate_at(c("GeneID"), as.character) %>% 
   group_by(TargetName) %>%
   summarise(across(everything(), ~ sum(., na.rm = TRUE)), .groups = "drop")
-# Combine
+# Combine the data
 countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>% 
   as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
-
 
 
 ######## CREATE SPATIAL EXPERIMENT OBJECT [seo]----
@@ -707,7 +706,7 @@ ROI_ANNOTATION_COLS <- c("SlideName", "Neuron", "Tissue", "CD45")
 dictionary <- c(TMM=seoUMAP_Normalized_TMM, Q3=seoUMAP_Normalized_Q3) #seoUMAP_Normalized_TMM (for TMM) or seoUMAP_Normalized_Q3 (for Q3)
 # eval(GRP)
 i = 1
-NORM = "TMM" #[INPUT_NEEDED] TMM or Q3 for naming the plots and files
+NORM = "Q3" #[INPUT_NEEDED] TMM or Q3 for naming the plots and files
 
 for(i in 1:length(ROI_ANNOTATION_COLS)){
   GRP <- ROI_ANNOTATION_COLS[[i]]
@@ -738,7 +737,8 @@ for(i in 1:length(ROI_ANNOTATION_COLS)){
 # library("colorRamp2")
 # BiocManager::install("qusage")
 # library("qusage")
-Sample_Data <- Sample_Data %>% mutate(SlideName = gsub("BBP", "BFP", SlideName))
+library("dplyr")
+Sample_Data <- Sample_Data %>% mutate(SlideName = gsub("BPP", "BFP", SlideName))
 Sample_Data[, "ROI"] <-  rownames(Sample_Data)
 Normalized_Counts_Data <- Normalized_Counts_Data_TMM
 MSIG_DB <- paste0(input_dir, "/MSIG_DB/")
@@ -750,7 +750,7 @@ MSigDB_Dictionary <- list(mh_all="HallMark Gene Sets",
                           m8_all="Cell Type Signature Gene Sets")
 #MSigDB_Dictionary$m8.all
 # UNIT = get("MSigDB_Dictionary")[["mh_all"]]
-
+# UNIT = get("MSigDB_Dictionary")[[geneset_name]]
 geneset =1
 for (geneset in 1:length(GeneSets)){
   # geneset_name <-  "m2_cp_biocarta" #For Non-loop version
@@ -817,8 +817,6 @@ for (geneset in 1:length(GeneSets)){
   graphics.off()
   #####################################
 }
-
-
 
 ##↓ ↓TODO See if Necessary to add PCA data again~~~~~~~~~~~~~~~~~~~~~~ ----
 #Do PCA plot of the geomxNorm'ed data (to update PCA data to object)
