@@ -295,7 +295,7 @@ for (comp in 2:2) { #[INPUT_NEEDED]
     # Milan Identify significant genes from the curated list
     PLOT_DATA[,"SIG_GENES"] <- NA
     PLOT_DATA[,"SIG_GENES"] <- ifelse(
-      PLOT_DATA[,"GENE"] %in% immune_pathways_genes_unique_c2 & #[INPUT_NEEDED] wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique
+      PLOT_DATA[,"GENE"] %in% naChannel_pathways_genes_unique & #[INPUT_NEEDED] immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique
         abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
         PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
       PLOT_DATA[,"GENE"],
@@ -339,8 +339,8 @@ for (comp in 2:2) { #[INPUT_NEEDED]
       geom_hline(yintercept = 0,color = "black")+
       # geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP2_NAME,"_(N:",length(GROUP2_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#4268F4") +
       # geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP1_NAME,"_(N:",length(GROUP1_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#303030") +
-      
-      geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP2_NAME,show.legend = F,size=20, color = "#4268F4", check_overlap = TRUE) +
+      #[INPUT_NEEDED] for BFP, since the name is BBP replace appropriate group name GROUP2_NAME to "BFP"
+      geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label="BFP",show.legend = F,size=20, color = "#4268F4", check_overlap = TRUE) +
       geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP1_NAME,show.legend = F,size=20,color = "#4268F4", check_overlap = TRUE) +
       
       xlim(c(L2FC_MIN,L2FC_MAX))+
@@ -375,7 +375,7 @@ for (comp in 2:2) { #[INPUT_NEEDED]
       scale_size_manual(values = c(0,1,2,3,4),breaks = c(0,1,2,3,4)) +
       #geom_text_repel(aes(x = G1_BE_VS_SQ_Like_Nuclei_DIFF, y = PVAL,label = SIG_GENES)) +
       # ggtitle(paste(DE_Analysis,"\n",TEST,"\nLog 2 FoldChange",sep = ""))+
-      ggtitle(paste("All significant Canonical immune related pathway genes(C2:3341)",sep = ""))+ #[INPUT_NEEDED]
+      ggtitle(paste("Sodium Channel Related Pathway Genes",sep = ""))+ #[INPUT_NEEDED]
       
       # xlab(paste(DE_Analysis,"\n Log2 Fold Change",sep="")) +
       xlab(paste("Log2 Fold Change",sep="")) +

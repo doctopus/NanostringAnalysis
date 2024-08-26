@@ -94,8 +94,7 @@ write_clip(immune_pathways_df)
 print(immune_pathways_df)
 
 
-
-# Extract unique genes associated with Wnt signaling
+#### Extract unique genes associated with Wnt signaling ----
 wnt_genes_mouse = unique(wnt_genesets_mouse$gene_symbol)
 #Check if a particular gene of interest is in the list
 "Dkk4" %in% wnt_genes_mouse
@@ -113,6 +112,36 @@ reactome_wnt_genes_mouse = wnt_genesets_mouse %>%
   unique()
 
 cat("Number of genes in REACTOME_SIGNALING_BY_WNT:", length(reactome_wnt_genes_mouse), "\n") #316
+
+#### Na Channel Reelated Genes ----
+msigdb_mouse = msigdbr(species = "Mus musculus") #3783805
+
+#Unique number of genes
+print(length(unique(msigdb_mouse$gene_symbol))) #17961
+print(length(unique(msigdb_mouse$gs_name))) #32872
+
+#Filter Na Channel related pathways in All Mouse Genesets
+naChannel_pathways_mouse = msigdb_mouse %>% 
+  filter((grepl("SODIUM", gs_name, ignore.case = TRUE) |
+           grepl("SODIUM", gs_description, ignore.case = TRUE)) &
+         (grepl("CHANNEL", gs_name, ignore.case = TRUE) |
+           grepl("CHANNEL", gs_description, ignore.case = TRUE)))
+#Same result as below
+naChannel_pathways_mouse = msigdb_mouse %>% 
+  filter((grepl("SODIUM", gs_description, ignore.case = TRUE)) &
+          (grepl("CHANNEL", gs_description, ignore.case = TRUE)))
+
+print(length(unique(naChannel_pathways_mouse$gs_name))) #13
+print(length(unique(naChannel_pathways_mouse$gene_symbol))) #102
+
+naChannel_pathways_unique <- unique(naChannel_pathways_mouse$gs_name)
+naChannel_pathways_genes_unique <- unique(naChannel_pathways_mouse$gene_symbol)
+
+head(naChannel_pathways_genes_unique)
+summary(naChannel_pathways_genes_unique)
+
+head(naChannel_pathways_unique)
+summary(naChannel_pathways_unique)
 
 #### Useful Functions ----
 
