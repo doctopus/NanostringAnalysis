@@ -55,13 +55,13 @@ datasets_list <- list(data_M_C.M, data_M_R.M, data_M_H.M, data_M_R.H.M, data_F_C
 
 # Purrr: Reduce the list of datasets by left joining based on the "Protien" column
 combined_data <- datasets_list %>%
-  reduce(left_join, by = "Protien")
+  reduce(left_join, by = "Protien") %>% dplyr::arrange(Protien =="CD3e") #Move the CD3e to the end
 
 # Set "Protien" column as row names
 rownames(combined_data) <- combined_data$Protien
 combined_data <- combined_data[, -which(colnames(combined_data) == "Protien")]
-#Remove CD3e row
-combined_data <- combined_data[!(row.names(combined_data) %in% c("CD3e")),]
+#Decide to Remove CD3e row
+# combined_data <- combined_data[!(row.names(combined_data) %in% c("CD3e")),]
 
 #SKIP -Create sample_info data template to modify from column names of commbined_data
 # sample_info <- data.frame(row.names = colnames(combined_data))
@@ -74,7 +74,7 @@ combined_data <- combined_data[!(row.names(combined_data) %in% c("CD3e")),]
 
 #Modify the written sample_info saved by above segment and read it back
 sample_info <- read.xlsx("sample_info.xlsx")
-#Manually add data in columns foor plotting
+#Manually add data in columns for plotting
 
 # Set "Sample" column as row names
 rownames(sample_info) <- sample_info$Sample
@@ -132,7 +132,9 @@ create_heatmap <- function(count_scores, pathway, sample_data) {
     Experiment = sample_data$Experiment,
     col = list(Sex = neuron_colors, Experiment = slide_colors),
     show_annotation_name = TRUE,
-    annotation_name_side = "left",
+    annotation_name_side = "right",
+    gap = unit(2, "mm"),
+    annotation_name_gp = gpar(fontsize = 20, fontface = "bold"),
     show_legend = FALSE  # Hide default legends for annotations
   )
   
@@ -150,12 +152,14 @@ create_heatmap <- function(count_scores, pathway, sample_data) {
                 name = paste(pathway, "Scores"),
                 col = colorRamp2(breaks, colors),
                 column_title = pathway,
-                column_title_gp = gpar(fontsize = 20, fontface = "bold", col = "darkblue"),
+                column_title_gp = gpar(fontsize = 26, fontface = "bold", col = "black"),
                 cluster_rows = FALSE,
                 cluster_columns = FALSE,
                 show_row_names = TRUE,
                 show_column_names = FALSE,
-                row_names_gp = gpar(fontsize = 12),
+                row_title_gp = gpar(fontsize = 15, fontface = "bold"),
+                # row_title_side = c("left", "right"),
+                row_names_gp = gpar(fontsize = 20, fontface = "bold"),
                 top_annotation = ha_top,
                 column_split = sample_data$Sex, #[INPUT_NEEDED] Change between sample_data$Sex or sample_data$Experiment
                 # column_order = column_order, #Needed for matching legend order with column order
@@ -167,21 +171,31 @@ create_heatmap <- function(count_scores, pathway, sample_data) {
   # Create custom legends
   sex_legend <- Legend(
     labels = sex_order,
+    labels_gp = gpar(fontsize = 20, fontface='bold'),#Increase size of labels
     legend_gp = gpar(fill = neuron_colors),
-    title = "Sex"
+    column_gap = unit(5, "mm"), row_gap = unit(2, "mm"),
+    title = "Sex",
+    title_gp = gpar(fontsize = 22, fontface='bold') #Increase size of legend label
   )
   
   experiment_legend <- Legend(
     labels = experiment_order,
+    labels_gp = gpar(fontsize = 20, fontface='bold'),#Increase size of labels
     legend_gp = gpar(fill = slide_colors),
-    title = "Experiment"
+    row_gap = unit(2, "mm"),
+    title = "Experiment",
+    title_gp = gpar(fontsize = 22, fontface='bold') #Increase size of legend label
   )
   
   expression_legend <- Legend(
     col_fun = colorRamp2(breaks, colors),
-    title = "Expression",
     at = c(-max_abs, 0, max_abs),
-    labels = c("Low", "Medium", "High")
+    labels = c("Low", "Medium", "High"),
+    labels_gp = gpar(fontsize = 20, fontface='bold'),#Increase size of labels
+    column_gap = unit(5, "mm"), 
+    row_gap = unit(5, "mm"),
+    title = "Expression",
+    title_gp = gpar(fontsize = 22, fontface='bold') #Increase size of legend label
   )
   
   # Combine all legends into a single column
@@ -189,16 +203,16 @@ create_heatmap <- function(count_scores, pathway, sample_data) {
     sex_legend,
     experiment_legend,
     expression_legend,
-    direction = "vertical",
+    direction = "horizontal", #vertical or horizontal
     gap = unit(5, "mm")
   )
   
   num_rows <- nrow(count_scores)
   total_height <- unit(min(15, max(10, num_rows * 0.4)), "inch")
   
-  # Draw the heatmap with only the combined legend on the left
+  # Draw the heatmap with only the combined legend on the left/bottom
   draw(ht, 
-       annotation_legend_side = "left",
+       annotation_legend_side = "bottom",
        annotation_legend_list = combined_legend,
        padding = unit(c(2, 20, 2, 10), "mm"),
        height = total_height)
@@ -208,13 +222,15 @@ plot_and_save_heatmap <- function(normalizedCountsData, sample_data_subset, path
   # Calculate height based on number of genes
   # height <- max(12, nrow(normalizedCountsData) * 0.2)  # Adjust the multiplier (0.2) as needed
   height <- 19
-  width <- 16
+  width <- 10.5 #16
   
   pdf(output_file, width = width, height = height)  # Increased width to accommodate legends
   create_heatmap(normalizedCountsData, pathway, sample_data_subset)
   dev.off()
+  print(create_heatmap(normalizedCountsData, pathway, sample_data_subset))
   print(paste("Heatmap for", pathway, "pathway saved to", output_file))
 }
+
 
 ############################
 #Create the Heatmap
@@ -237,9 +253,8 @@ plot_and_save_heatmap(
   scaled_data, #combined_data or scaled_data
   sample_info, 
   "Protein Expression", 
-  "18_Protein_Expression.pdf"
+  "37_Protein_Expression-Legend below -annotation right -Row ordered -Bold.pdf"
 )
-
 
 #Get an estimate of score range in scaled data to cap the range----
 # Basic statistics

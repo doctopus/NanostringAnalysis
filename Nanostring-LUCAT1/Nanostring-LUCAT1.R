@@ -78,7 +78,7 @@ install_and_load_packages <- function(cran_packages, bioc_packages) {
   all_packages <- c(cran_packages, bioc_packages)
   sapply(all_packages, require, character.only = TRUE)
 }
-sentence_case <- function(name) { 
+sentence_case <- function(name) {
   # Sentence case first word if not uppercase with/out numbers/"-" (eg.DN-A1)
   # Split the sentence into words
   words <- unlist(strsplit(name, " "))
@@ -307,13 +307,14 @@ install_and_load_packages(cran_packages, bioc_packages)
 getwd()
 file_samplesheet<-paste0(input_dir,"/samplesheet.csv")
 file_source<-paste0(input_dir,"/LUCAT1 KD Initial Dataset .xlsx")
+# file_gene_of_interest <- paste0(input_dir, "/Crispr screen gene targets.xlsx")
 
 #Getting the Collected GeneSet of Interest from Excel List
-geneList <- readxl::read_excel(file_gene_of_interest, col_names = FALSE, sheet = "Sheet1")
-genesWithNa <- as.vector(as.matrix(geneList))
-genes <- values[!is.na(genesWithNa)] # Remove NA values
-GenesOfInterest <- unlist(genes) # Convert to simple list
-GenesOfInterest <- data.frame(GenesOfInterest)
+# geneList <- readxl::read_excel(file_gene_of_interest, col_names = FALSE, sheet = "Sheet1")
+# genesWithNa <- as.vector(as.matrix(geneList))
+# genes <- values[!is.na(genesWithNa)] # Remove NA values
+# GenesOfInterest <- unlist(genes) # Convert to simple list
+# GenesOfInterest <- data.frame(GenesOfInterest)
 # print(GenesOfInterest) # Print the list
 
 #Sample Data for downstream analysis
@@ -429,7 +430,7 @@ graphics.off()
 plotSampleInfo(seo, column2plot =c("Samples", "Tumor")) + coord_flip()
 
 #### Gene level QC [seo_qc]----
-seo #Dim 18676x175
+seo #Dim 18676x24
 names(colData(seo)) #46 Columns in ColData
 view(seo@colData)
 seo_qc <- addPerROIQC(seo, 
@@ -514,17 +515,17 @@ seo_qc@colData$AOINucleiCount
 view(seo_qc@colData)
 #AOINuclei count of 150 looks like a good threshold from the figure
 qc_keep <- colData(seo_qc)$AOINucleiCount > 300 &
-  colData(seo_qc)$RawReads > 1e+05 &
-  colData(seo_qc)$AlignedReads > 80 &
+  colData(seo_qc)$AOISurfaceArea > 25000 &
+  colData(seo_qc)$RawReads > 2.5e+05 &
+  colData(seo_qc)$AlignedReads > 2500000 &
   colData(seo_qc)$TrimmedReads > 80 &
   colData(seo_qc)$StitchedReads > 80 &
   colData(seo_qc)$SequencingSaturation > 50
 
 table(qc_keep) # 3 Values Below threshold
-dim(seo_qc) # Dim 19948x175
+dim(seo_qc) # Dim 18676x24
 seo_qc_roi <- seo_qc[, qc_keep]
-dim(seo_qc_roi) # We removed 3 ROI (samples/columns)from dataset. Dim 19948x172
-#In second analysis we removed 28 samples, and went ahead with 147 ROIs.
+dim(seo_qc_roi) # Noothing Removed
 # Comparing the Library Size with ROI Area size
 view(seo_qc_roi@colData)
 sum(seo_qc_roi@colData$Samples =="CONTROL")
