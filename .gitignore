@@ -11,6 +11,8 @@
 *.png
 *.pdf
 *.xlsx
+*.zip
+*.tiff
 # Ignore all files in io directory
 input/*
 output/*

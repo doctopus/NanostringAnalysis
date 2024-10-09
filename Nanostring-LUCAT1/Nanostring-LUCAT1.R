@@ -827,7 +827,7 @@ for (geneset in 1:length(GeneSets)){
   UNIT = get("MSigDB_Dictionary")[[geneset_name]]
   #########################3
   
-  ssGSEA_Heatmap <- heatmap_func_ss(Input_DF,COL_ANNOT,100) #*NEW from last analsysis, added UNIT, improved the function
+  ssGSEA_Heatmap <- heatmap_func_ss(Input_DF,COL_ANNOT,100, UNIT) #*NEW from last analsysis, added UNIT, improved the function
   
   #NCOLS = as.character(length(Heatmap_Data[,1]))
   #NROWS = as.character(length(Heatmap_Data[1,]))
