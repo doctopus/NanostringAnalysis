@@ -761,6 +761,8 @@ for(i in 1:length(ROI_ANNOTATION_COLS)){
 # library("colorRamp2")
 # BiocManager::install("qusage")
 # library("qusage")
+# Sample_Data <- Sample_Data %>% mutate(SlideName = gsub("BPP", "BFP", SlideName))
+Sample_Data[, "ROI"] <-  rownames(Sample_Data) #Get the ROI names from the rownames as a separate column ROI
 Normalized_Counts_Data <- Normalized_Counts_Data_TMM
 
 MSIG_DB <- paste0(input_dir, "/MSIG_DB/")
