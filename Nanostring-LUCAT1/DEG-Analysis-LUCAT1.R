@@ -1,5 +1,11 @@
 ## DEG Analysis Code Reformatting -Ongoing Original Working code still there 889 to 1367
 
+genes_HIF1 <- c("LUCAT1", "HIF1A", "EPAS1", "ARRDC3", "NDRG1", "GLUT1", "PDK1", "PGK1", "VEGFA", "ARNT", "CREBBP", "EP300")
+#Alternative Names LUCAT1=SCAL1, EPAS1=HIF2A, CREBBP=CBP, EP300=P300
+
+genes_DDR <- c("XRCC6", "XRCC2", "RAD54L", "PRKDC", "PTEN", "BRCA1", "BRCA2", "EXO1", "RAD51", "BLM", "POLQ", "PARP3")
+#Alternative Names: XRCC6=Ku70, PRKDC=DNA PKcs, BLM=RECQL3
+
 #### COMPARISON BETWEEN GROUPS [VOLCANO PLOT]----
 # Inputs: Sample_Data, Counts_Data, Feature_Data, Normalized Counts Data
 #Sample_Data should have had the SlideName alrerady modified by now, and ROI Column added,
