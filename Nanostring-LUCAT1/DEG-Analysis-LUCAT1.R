@@ -2,9 +2,13 @@
 
 genes_HIF1 <- c("LUCAT1", "HIF1A", "EPAS1", "ARRDC3", "NDRG1", "GLUT1", "PDK1", "PGK1", "VEGFA", "ARNT", "CREBBP", "EP300")
 #Alternative Names LUCAT1=SCAL1, EPAS1=HIF2A, CREBBP=CBP, EP300=P300
+genes_HIF1_synonyms <- c("SCAL1", "HIF2A", "CBP", "P300")
 
 genes_DDR <- c("XRCC6", "XRCC2", "RAD54L", "PRKDC", "PTEN", "BRCA1", "BRCA2", "EXO1", "RAD51", "BLM", "POLQ", "PARP3")
 #Alternative Names: XRCC6=Ku70, PRKDC=DNA PKcs, BLM=RECQL3
+genes_DDR_synonyms <- c("RECQL3")
+
+genes_HIF1_DDR <- c(genes_DDR, genes_DDR_synonyms, genes_HIF1, genes_HIF1_synonyms)
 
 #### COMPARISON BETWEEN GROUPS [VOLCANO PLOT]----
 # Inputs: Sample_Data, Counts_Data, Feature_Data, Normalized Counts Data
@@ -31,8 +35,8 @@ COMPARE_TABLE <- as.data.frame(cbind(
           GROUP2_NAME=c("CONTROL","TUMOR_EDGE", "TUMOR_INSIDE")
   ))
 
-comp =3 #[INPUT_NEEDED]
-for (comp in 3:3) { #[INPUT_NEEDED]
+comp =1 #[INPUT_NEEDED]
+for (comp in 1:3) { #[INPUT_NEEDED]
   print (comp)
   COMPARE_GROUP_NAME = COMPARE_TABLE[comp,"COMPARE_GROUP_NAME"] 
   GROUP1_NAME = COMPARE_TABLE[comp,"GROUP1_NAME"] 
@@ -286,12 +290,12 @@ for (comp in 3:3) { #[INPUT_NEEDED]
     PLOT_DATA[,"Rank"] <- as.numeric(rownames(PLOT_DATA))
     ###~~~~~~~~~~~~
     #SSSS Highlight significant genes if they have a THRESHOLD value of 2 or higher and are among the top 25 ranked genes based on their LOG2FC values.
-    PLOT_DATA[,"SIG_GENES"] <- NA
-    PLOT_DATA[,"SIG_GENES"] <- ifelse(((abs(PLOT_DATA[,"THRESHOLD"])>=2) & (PLOT_DATA[,"Rank"]<=25)),PLOT_DATA[,"GENE"],NA)
-    PLOT_DATA <- PLOT_DATA[order(PLOT_DATA[,"LOG2FC"],decreasing = F),]
-    rownames(PLOT_DATA) <- NULL
-    PLOT_DATA[,"Rank"] <- as.numeric(rownames(PLOT_DATA))
-    PLOT_DATA[,"SIG_GENES"] <- ifelse(((abs(PLOT_DATA[,"THRESHOLD"])>=2) & (PLOT_DATA[,"Rank"]<=25)),PLOT_DATA[,"GENE"],PLOT_DATA[,"SIG_GENES"])
+    # PLOT_DATA[,"SIG_GENES"] <- NA
+    # PLOT_DATA[,"SIG_GENES"] <- ifelse(((abs(PLOT_DATA[,"THRESHOLD"])>=2) & (PLOT_DATA[,"Rank"]<=25)),PLOT_DATA[,"GENE"],NA)
+    # PLOT_DATA <- PLOT_DATA[order(PLOT_DATA[,"LOG2FC"],decreasing = F),]
+    # rownames(PLOT_DATA) <- NULL
+    # PLOT_DATA[,"Rank"] <- as.numeric(rownames(PLOT_DATA))
+    # PLOT_DATA[,"SIG_GENES"] <- ifelse(((abs(PLOT_DATA[,"THRESHOLD"])>=2) & (PLOT_DATA[,"Rank"]<=25)),PLOT_DATA[,"GENE"],PLOT_DATA[,"SIG_GENES"])
     ###~~~~~~~~~~~~
     #Keep ~~~ OR ^^^ Segment
     ###^^^^^^^^^^^^^^^
@@ -302,14 +306,14 @@ for (comp in 3:3) { #[INPUT_NEEDED]
     pval_threshold <- 0.05 #-log10(0.05)
     
     # Milan Identify significant genes from the curated list
-    # PLOT_DATA[,"SIG_GENES"] <- NA
-    # PLOT_DATA[,"SIG_GENES"] <- ifelse(
-    #   PLOT_DATA[,"GENE"] %in% hypoxia_genes & #[INPUT_NEEDED] immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique, naChannel_pathways_genes_unique
-    #     abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
-    #     PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
-    #   PLOT_DATA[,"GENE"],
-    #   NA
-    # )
+    PLOT_DATA[,"SIG_GENES"] <- NA
+    PLOT_DATA[,"SIG_GENES"] <- ifelse(
+      PLOT_DATA[,"GENE"] %in% genes_HIF1_DDR & #[INPUT_NEEDED] immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique, naChannel_pathways_genes_unique
+        abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
+        PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
+      PLOT_DATA[,"GENE"],
+      NA
+    )
     ###^^^^^^^^^^^^^^^
     
     
@@ -387,7 +391,7 @@ for (comp in 3:3) { #[INPUT_NEEDED]
       scale_size_manual(values = c(0,1,2,3,4),breaks = c(0,1,2,3,4)) +
       #geom_text_repel(aes(x = G1_BE_VS_SQ_Like_Nuclei_DIFF, y = PVAL,label = SIG_GENES)) +
       # ggtitle(paste(DE_Analysis,"\n",TEST,"\nLog 2 FoldChange",sep = ""))+
-      ggtitle(paste("Significant Differentially Expressed Genes",sep = ""))+ #[INPUT_NEEDED]
+      ggtitle(paste("Significant Differentially Expressed Genes of Interest",sep = ""))+ #[INPUT_NEEDED]
       
       # xlab(paste(DE_Analysis,"\n Log2 Fold Change",sep="")) +
       xlab(paste("Log2 Fold Change",sep="")) +
