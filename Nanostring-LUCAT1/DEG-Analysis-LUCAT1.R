@@ -10,19 +10,32 @@ genes_DDR_synonyms <- c("RECQL3")
 
 genes_HIF1_DDR <- c(genes_DDR, genes_DDR_synonyms, genes_HIF1, genes_HIF1_synonyms)
 
-#### COMPARISON BETWEEN GROUPS [VOLCANO PLOT]----
+#Modifying the output dir to the Subset Directory
+output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/NanostringAnalysis/Nanostring-LUCAT1/output/SubsetAnalysis"
+
+
+#### COMPARISON BETWEEN GROUPS [VOLCANO PLOT] (Subset and Main Analysis Merged using the same variables)----
 # Inputs: Sample_Data, Counts_Data, Feature_Data, Normalized Counts Data
 #Sample_Data should have had the SlideName alrerady modified by now, and ROI Column added,
 #Ensure that it is indeed added.
 # Sample_Data <- Sample_Data %>% mutate(SlideName = gsub("BBP", "BFP", SlideName))
 # Sample_Data[, "ROI"] <-  rownames(Sample_Data)
 #Normalized counts data should be imported from the previously prepared data
+
+#For Subset and Main Sample_Data has been processed before by adding ROI
 Sample_Data <- Sample_Data #Make sure Sample_Data has ROI column extracted from the row names previously
-Normalized_Counts_Data <- Normalized_Counts_Data_TMM
+#For Main
+# Normalized_Counts_Data <- Normalized_Counts_Data_TMM
+#For Subset (Also, Already converted in the GSEA Step)
+Normalized_Counts_Data <- Normalized_Counts_Data_TMM_Subset
+
+#Merging other Subset Specific Datasets as the Main dataset
+Counts_Data <- Counts_Data_Subset
+Feature_Data <- Feature_Data_Subset
 
 # Ensure the input files exist
 if (exists ("Sample_Data") & exists ("Counts_Data") & exists ("Feature_Data") &
-    exists ("Normalized_Counts_Data_TMM")) {
+    exists ("Normalized_Counts_Data")) {
   print("All Required Files Exist")
 } else {
   print("All Input Files Don't Exist, Load Them")
@@ -64,7 +77,7 @@ for (comp in 1:3) { #[INPUT_NEEDED]
   print(dim(Comparision_Counts_Data))
   
   #Normalized Counts Data
-  Experiment_Normalised_Counts <- Normalized_Counts_Data_TMM
+  Experiment_Normalised_Counts <- Normalized_Counts_Data
   Comparision_Normalised_Counts_Data <- Experiment_Normalised_Counts[,c(GROUP1_SAMPLES,GROUP2_SAMPLES)]
   print(dim(Comparision_Normalised_Counts_Data))
   
@@ -290,12 +303,12 @@ for (comp in 1:3) { #[INPUT_NEEDED]
     PLOT_DATA[,"Rank"] <- as.numeric(rownames(PLOT_DATA))
     ###~~~~~~~~~~~~
     #SSSS Highlight significant genes if they have a THRESHOLD value of 2 or higher and are among the top 25 ranked genes based on their LOG2FC values.
-    # PLOT_DATA[,"SIG_GENES"] <- NA
-    # PLOT_DATA[,"SIG_GENES"] <- ifelse(((abs(PLOT_DATA[,"THRESHOLD"])>=2) & (PLOT_DATA[,"Rank"]<=25)),PLOT_DATA[,"GENE"],NA)
-    # PLOT_DATA <- PLOT_DATA[order(PLOT_DATA[,"LOG2FC"],decreasing = F),]
-    # rownames(PLOT_DATA) <- NULL
-    # PLOT_DATA[,"Rank"] <- as.numeric(rownames(PLOT_DATA))
-    # PLOT_DATA[,"SIG_GENES"] <- ifelse(((abs(PLOT_DATA[,"THRESHOLD"])>=2) & (PLOT_DATA[,"Rank"]<=25)),PLOT_DATA[,"GENE"],PLOT_DATA[,"SIG_GENES"])
+    PLOT_DATA[,"SIG_GENES"] <- NA
+    PLOT_DATA[,"SIG_GENES"] <- ifelse(((abs(PLOT_DATA[,"THRESHOLD"])>=2) & (PLOT_DATA[,"Rank"]<=25)),PLOT_DATA[,"GENE"],NA)
+    PLOT_DATA <- PLOT_DATA[order(PLOT_DATA[,"LOG2FC"],decreasing = F),]
+    rownames(PLOT_DATA) <- NULL
+    PLOT_DATA[,"Rank"] <- as.numeric(rownames(PLOT_DATA))
+    PLOT_DATA[,"SIG_GENES"] <- ifelse(((abs(PLOT_DATA[,"THRESHOLD"])>=2) & (PLOT_DATA[,"Rank"]<=25)),PLOT_DATA[,"GENE"],PLOT_DATA[,"SIG_GENES"])
     ###~~~~~~~~~~~~
     #Keep ~~~ OR ^^^ Segment
     ###^^^^^^^^^^^^^^^
@@ -306,14 +319,14 @@ for (comp in 1:3) { #[INPUT_NEEDED]
     pval_threshold <- 0.05 #-log10(0.05)
     
     # Milan Identify significant genes from the curated list
-    PLOT_DATA[,"SIG_GENES"] <- NA
-    PLOT_DATA[,"SIG_GENES"] <- ifelse(
-      PLOT_DATA[,"GENE"] %in% genes_HIF1_DDR & #[INPUT_NEEDED] immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique, naChannel_pathways_genes_unique
-        abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
-        PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
-      PLOT_DATA[,"GENE"],
-      NA
-    )
+    # PLOT_DATA[,"SIG_GENES"] <- NA
+    # PLOT_DATA[,"SIG_GENES"] <- ifelse(
+    #   PLOT_DATA[,"GENE"] %in% genes_HIF1_DDR, #& #[INPUT_NEEDED] immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique, naChannel_pathways_genes_unique
+    #     #abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
+    #     #PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
+    #   PLOT_DATA[,"GENE"],
+    #   NA
+    # )
     ###^^^^^^^^^^^^^^^
     
     
@@ -348,10 +361,10 @@ for (comp in 1:3) { #[INPUT_NEEDED]
       geom_vline(xintercept = 0,color = "black", linetype='dashed',color = "#4268F4")+
       geom_vline(xintercept = as.numeric(log(2,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+
       geom_vline(xintercept = -as.numeric(log(2,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+
-      geom_vline(xintercept = as.numeric(log(2,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+
-      geom_vline(xintercept = -as.numeric(log(2,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+
+      # geom_vline(xintercept = as.numeric(log(3,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+ #log 3, base2
+      # geom_vline(xintercept = -as.numeric(log(3,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+ #log3, base2
       geom_hline(yintercept = PVAL_th, linetype='dashed',color = "#4268F4")+
-      # geom_hline(yintercept = PVALADJ_th, linetype='dashed',color = "#4268F4")+
+      # geom_hline(yintercept = PVALADJ_th, linetype='dashed',color = "#007DEF")+
       geom_hline(yintercept = 0,color = "black")+
       # geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP2_NAME,"_(N:",length(GROUP2_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#4268F4") +
       # geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP1_NAME,"_(N:",length(GROUP1_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#303030") +

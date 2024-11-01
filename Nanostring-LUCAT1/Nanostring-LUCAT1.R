@@ -299,9 +299,6 @@ bioc_packages <- c("ComplexHeatmap","edgeR", "fgsea", "GSEABase", "GSVA", "limma
 install_and_load_packages(cran_packages, bioc_packages)
 
 ######## Source & Process Input files ----
-#Since the data is normalized counts; can not run the DESeq2 Pipeline
-#So resorting to Limma Voom. Pipeline. Install edgeR, that installs limma as a dependency
-
 # library("edgeR")
 # library("tidyverse")
 getwd()
@@ -323,6 +320,9 @@ Sample_Data<-read.csv(file = file_samplesheet,
                       stringsAsFactors = FALSE, #Made false to keep it as character
                       check.names = FALSE,
                       row.names = "TargetName")
+#For-Subset of ROI Analysis
+#Removing 001, 008, 009 from KD, and 016, 017, 018 from Control
+Sample_Data_Subset <- Sample_Data %>% filter(!(grepl("001|008|009|010|011|012|016|017|018", rownames(.))))
 
 # sampleAnnoFile from SegmentProperties sheet
 # countFile & featureAnnoFile from BioProbeCountMatrix sheet
@@ -344,6 +344,11 @@ next_sampleAnnoFile <- next_sampleAnnoFile %>%
                            gsub("CONTROL INSIDE", "TUMOR_INSIDE", Sample)))) 
 sampleAnnoFile <- next_sampleAnnoFile %>% 
   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
+
+sampleAnnoFile_Subset <- sampleAnnoFile %>% filter(!(grepl("001|008|009|010|011|012|016|017|018", sampleAnnoFile$ROILabel)))
+#Optional: Remove Intermediate files from memory
+rm(next_sampleAnnoFile)
+rm(pre_sampleAnnoFile)
 
 #### featureAnnoFile----
 #BioProbeCountMatrix Worksheet: TargetName is default column
@@ -381,6 +386,10 @@ featureAnnoFile <- bind_rows(featureAnnoFile_NegProbeWTX, featureAnnoFile_others
 #As TargetName (Which is the default Defined column of Nanostring Data) which holds gene Name and also multiple NegProbe-WTX 
 #is not retained, so create anther column to retain it for DEG analysis.
 featureAnnoFile[,"TargetGene"] <- featureAnnoFile[,"TargetName"]
+#Subset or selected ROIs is same
+featureAnnoFile_Subset <- featureAnnoFile
+#Optional: Remove intermediate files
+rm(pre_featureAnnoFile, next_featureAnnoFile, featureAnnoFile_NegProbeWTX, featureAnnoFile_others)
 
 #### countFile----
 pre_countFile <- readxl::read_excel(file_source, 
@@ -403,6 +412,12 @@ countFile_others <- next_countFile %>%
 countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>% 
   as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
 
+#Subset the columns to keep only the ROI of interest
+countFile_Subset <- countFile %>% dplyr::select(-matches("001|008|009|010|011|012|016|017|018"))
+
+#Optional: remove intermediate datasets
+rm(pre_countFile, next_countFile, countFile_NegProbeWTX, countFile_others)
+
 ######## CREATE SPATIAL EXPERIMENT OBJECT [seo]----
 # BiocManager::install("standR")
 # library(standR)
@@ -412,7 +427,10 @@ countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>%
 seo <- readGeoMx(countFile = countFile,
                  sampleAnnoFile = sampleAnnoFile,
                  featureAnnoFile = featureAnnoFile)
-
+#For the ROI subset of interest
+seo_Subset <- readGeoMx(countFile = countFile_Subset,
+                        sampleAnnoFile = sampleAnnoFile_Subset,
+                        featureAnnoFile = featureAnnoFile_Subset)
 ######## QC Steps ---- 
 #Sample level QC
 # library(ggplot2)
@@ -425,15 +443,21 @@ dir.create(QC_DIR)
 graphics.off()
 pdf(paste(QC_DIR, "Metadata.pdf", sep = ""), width=10, height = 10)
 plotSampleInfo(seo, column2plot =c("SlideName", "Samples", "Tumor"))
-graphics.off()
+# plotSampleInfo(seo_Subset, column2plot =c("SlideName", "Samples", "Tumor"))
+# graphics.off()
 
 plotSampleInfo(seo, column2plot =c("Samples", "Tumor")) + coord_flip()
-
+# plotSampleInfo(seo_Subset, column2plot =c("Samples", "Tumor")) + coord_flip()
 #### Gene level QC [seo_qc]----
 seo #Dim 18676x24
+seo_Subset #Dim 18676x15
 names(colData(seo)) #46 Columns in ColData
 view(seo@colData)
 seo_qc <- addPerROIQC(seo, 
+                      sample_fraction = 0.9, #Default
+                      rm_genes =TRUE, #Default
+                      min_count = 5) #Default
+seo_qc_Subset <- addPerROIQC(seo_Subset, 
                       sample_fraction = 0.9, #Default
                       rm_genes =TRUE, #Default
                       min_count = 5) #Default
@@ -441,7 +465,7 @@ seo_qc #Gene with low count and expression values in more than threshold (sample
 # are removed by applying the function. Dim 19948x175, so removed 14 genes
 dim(seo) 
 dim(seo_qc) #Genes not meeting the above criteria were removed 19962 > 19948 
-
+#dim(seo_qc_Subset) # 18675x15 (One gene removed)
 #If any genes are getting removed, we could plot those to visualize.
 columns_of_interest <- c("SlideName")
 
@@ -471,7 +495,7 @@ plotGeneQC(seo_qc, top_n=12, ordannots = "Samples", col = Samples, point_size = 
 #colData(seo)$regions
 #colnames(seo) %>% print() 
 
-#Final data of this segment: seo_qc
+#Final data of this segment: seo_qc OR seo_qc_Subset
 #### ROI level QC [seo_qc_roi]----
 names(seo_qc@colData)
 view(seo_qc@colData)
@@ -522,10 +546,20 @@ qc_keep <- colData(seo_qc)$AOINucleiCount > 300 &
   colData(seo_qc)$StitchedReads > 80 &
   colData(seo_qc)$SequencingSaturation > 50
 
-table(qc_keep) # 3 Values Below threshold
+qc_keep_Subset <- colData(seo_qc_Subset)$AOINucleiCount > 300 &
+  colData(seo_qc_Subset)$AOISurfaceArea > 25000 &
+  colData(seo_qc_Subset)$RawReads > 2.5e+05 &
+  colData(seo_qc_Subset)$AlignedReads > 2500000 &
+  colData(seo_qc_Subset)$TrimmedReads > 80 &
+  colData(seo_qc_Subset)$StitchedReads > 80 &
+  colData(seo_qc_Subset)$SequencingSaturation > 50
+
+table(qc_keep) # No Values Below threshold
+# table(qc_keep_Subset) # No Values Below threshold
 dim(seo_qc) # Dim 18676x24
 seo_qc_roi <- seo_qc[, qc_keep]
-dim(seo_qc_roi) # Noothing Removed
+seo_qc_roi_Subset <- seo_qc_Subset[, qc_keep_Subset] #No ROI Removed
+dim(seo_qc_roi) # Nothing Removed
 # Comparing the Library Size with ROI Area size
 view(seo_qc_roi@colData)
 sum(seo_qc_roi@colData$Samples =="CONTROL")
@@ -601,7 +635,7 @@ plotRLExpr(seo_qc_roi, ordannots = "Tumor", assay = 2, color = Tumor)+ ggtitle("
 #can also plot by tissue type or other classification
 plotRLExpr(seo_qc_roi, ordannots = "Samples", assay = 2, color = Samples)+ ggtitle("Post QC Data")
 
-
+#Final Data of this segment seo_qc_roi OR seo_qc_roi_Subset
 ######## Dimentionality Reduction [seoPCA->seoUMAP]----
 #seo_qc_roi@assays #Assay 2 is based on logcounts
 # BiocManager::install("scater")
@@ -617,6 +651,13 @@ pca_results <-  reducedDim(seoPCA, "PCA")
 drawPCA(seoPCA, precomputed = pca_results, col = Tumor)
 drawPCA(seoPCA, precomputed = pca_results, col = Samples)
 
+#For the subset
+seoPCA_Subset <-  scater::runPCA(seo_qc_roi_Subset)
+#runPCA adds reducedDimNames PCA
+pca_results_Subset <-  reducedDim(seoPCA_Subset, "PCA")
+drawPCA(seoPCA_Subset, precomputed = pca_results_Subset, col = Tumor)
+drawPCA(seoPCA_Subset, precomputed = pca_results_Subset, col = Samples)
+
 #Draw PCA Scree Plot
 plotScreePCA(seo_qc_roi, precomputed = pca_results)
 #Plot Pair PCA
@@ -630,13 +671,21 @@ standR::plotMDS(seo_qc_roi, assay = 2, color = Tumor)
 
 #UMAP
 set.seed(100)
-
 seoUMAP <- scater::runUMAP(seoPCA, dimred = "PCA")
 #runUMAP adds one more reducedDimNames UMAP
 plotDR(seoUMAP, dimred = "UMAP", col = Samples)
 plotDR(seoUMAP, dimred = "UMAP", col = Tumor)
 
+#For the subset
+set.seed(100)
+seoUMAP_Subset <- scater::runUMAP(seoPCA_Subset, dimred = "PCA")
+#runUMAP adds one more reducedDimNames UMAP
+plotDR(seoUMAP_Subset, dimred = "UMAP", col = Samples)
+plotDR(seoUMAP_Subset, dimred = "UMAP", col = Tumor)
+
+
 names(seoUMAP@metadata)
+#output of this Section seoUMAP OR seoUMAP_Subset
 
 ######## ↓ ↓ Q3 Normalization and Saving Data [seoUMAP -> seoUMAP_Normalized_Q3] ----
 # Input: seoUMAP; output: seoUMAP_Normalized_Q3
@@ -659,6 +708,10 @@ NORMALIZATION <- "upperquartile"
 
 seoUMAP_Normalized_Q3 <- geomxNorm(seoUMAP, method=NORMALIZATION, log = T)
 
+#For Subset
+seoUMAP_Normalized_Q3_Subset <- geomxNorm(seoUMAP_Subset, method=NORMALIZATION, log = T)
+
+
 names(seoUMAP_Normalized_Q3@metadata) #Added "norm.method" and "norm.factor" to metadata
 seoUMAP_Normalized_Q3@metadata$norm.method
 seoUMAP_Normalized_Q3@metadata$norm.factor
@@ -668,6 +721,8 @@ plotRLExpr(seoUMAP_Normalized_Q3, assay = 2, color = Tumor) + ggtitle("Q3 Normal
 ##Make Normalized Count Data ----
 
 Normalized_Counts_Data_Q3 <- as.data.frame(logcounts(seoUMAP_Normalized_Q3))
+#For Subset
+Normalized_Counts_Data_Q3_Subset <- as.data.frame(logcounts(seoUMAP_Normalized_Q3_Subset))
 
 ##(SKIP IF NOT SAVING Normalized Count Data)Generate a Gene Column for Data Saving ----
 Normalized_Counts_Data_Q3 <- as.data.frame(cbind(Gene=rownames(Normalized_Counts_Data), Normalized_Counts_Data))
@@ -690,7 +745,7 @@ Feature_Data <- as.data.frame(rowData(seoUMAP_Normalized_Q3))
 Sample_Data <- as.data.frame(colData(seoUMAP_Normalized_Q3))
 #Skip if not saving
 #Sample_Data <- as.data.frame(cbind(ROI=rownames(Sample_Data), Sample_Data))
-
+#Output of this section Normalized_Counts_Data_Q3 or _Subset
 
 #↑ ↑ Q3 Normalization End~~~~~~~~~~~~~~~~~~
 
@@ -700,6 +755,8 @@ Sample_Data <- as.data.frame(colData(seoUMAP_Normalized_Q3))
 #names(seoUMAP@metadata)
 NORMALIZATION_METHOD <- "TMM"
 seoUMAP_Normalized_TMM <- geomxNorm(seoUMAP, method = NORMALIZATION_METHOD, log = TRUE) #TMM Normalization
+#For Subset
+seoUMAP_Normalized_TMM_Subset <- geomxNorm(seoUMAP_Subset, method = NORMALIZATION_METHOD, log = TRUE) #TMM Normalization
 #geomxNorm Adds two more items to metadata: norm.factor, norm.method
 
 #names(seoUMAP_Normalized_TMM@metadata)
@@ -710,13 +767,22 @@ seoUMAP_Normalized_TMM@metadata$norm.method
 seoUMAP_Normalized_TMM@metadata$norm.factor
 #Make Count Data from Source seoUMAP----
 Counts_Data <- as.data.frame(counts(seoUMAP))
+#For Subset
+Counts_Data_Subset <- as.data.frame(counts(seoUMAP_Subset))
 #Make Normalized Count from TMM----
 Normalized_Counts_Data_TMM <- as.data.frame(logcounts(seoUMAP_Normalized_TMM))
-
+#For Subset
+Normalized_Counts_Data_TMM_Subset <- as.data.frame(logcounts(seoUMAP_Normalized_TMM_Subset))
 ###Make Sample Data -Same from Q3 or TMM File----
 Sample_Data <- as.data.frame(colData(seoUMAP_Normalized_TMM))
+#For Subset
+Sample_Data_Subset <- as.data.frame(colData(seoUMAP_Normalized_TMM_Subset))
 ##Make Feature Data ----
 Feature_Data <- as.data.frame(rowData(seoUMAP_Normalized_TMM))
+#For Subset
+Feature_Data_Subset <- as.data.frame(rowData(seoUMAP_Normalized_TMM_Subset))
+
+#Output of this section Count_Data, Feature_Data, Normalized_Counts_Data OR their subset equivalent
 ##↓↓~~~~~~~~~~~~~~~~~~~~~
 
 ####LOOP Plot QC Figures in Loop----
@@ -753,7 +819,7 @@ for(i in 1:length(ROI_ANNOTATION_COLS)){
 
 
 
-#### ssGSEA Analysis----
+#### ssGSEA Analysis (Subset made to be the same variable; no branching paths for each)----
 # library("ComplexHeatmap")
 # library("GSVA")
 # library("RColorBrewer")
@@ -762,8 +828,18 @@ for(i in 1:length(ROI_ANNOTATION_COLS)){
 # BiocManager::install("qusage")
 # library("qusage")
 # Sample_Data <- Sample_Data %>% mutate(SlideName = gsub("BPP", "BFP", SlideName))
+
+#For Subset (Convert Subset to the same main variable for ease of running)
+Sample_Data <- Sample_Data_Subset
+
 Sample_Data[, "ROI"] <-  rownames(Sample_Data) #Get the ROI names from the rownames as a separate column ROI
-Normalized_Counts_Data <- Normalized_Counts_Data_TMM
+
+#For Subset (Convert Subset to the same main variable for ease of running)
+Normalized_Counts_Data <- Normalized_Counts_Data_TMM_Subset
+#For Main
+# Normalized_Counts_Data <- Normalized_Counts_Data_TMM
+
+
 
 MSIG_DB <- paste0(input_dir, "/MSIG_DB/")
 GeneSets <- list.files(MSIG_DB, pattern= "*.gmt", full.names = F)
@@ -837,7 +913,7 @@ for (geneset in 1:length(GeneSets)){
   graphics.off()
   # pdf_height <- max(30, nrow(Input_DF) * 0.2)  # Adjust the multiplier as needed
   pdf_height <- 30
-  pdf(paste(output_dir, "/", geneset_name,"_ssGSEAScores.pdf",sep=""),width =60,height =pdf_height) #Changed to variable instead of 30
+  pdf(paste(output_dir, "/SubsetAnalysis/", geneset_name,"_ssGSEAScores.pdf",sep=""),width =60,height =pdf_height) #Changed to variable instead of 30
   draw(ssGSEA_Heatmap,padding = unit(c(1,5,1,1), "in"),heatmap_legend_side = "right",row_title = "", row_title_gp = gpar(col = "red"),legend_grouping = "original",
        column_title = paste("ssGSEA- ", UNIT,sep=""), column_title_gp = gpar(fontsize = 32))
   graphics.off()
