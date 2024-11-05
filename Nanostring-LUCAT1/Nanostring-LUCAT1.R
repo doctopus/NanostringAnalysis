@@ -322,7 +322,7 @@ Sample_Data<-read.csv(file = file_samplesheet,
                       row.names = "TargetName")
 #For-Subset of ROI Analysis
 #Removing 001, 008, 009 from KD, and 016, 017, 018 from Control
-Sample_Data_Subset <- Sample_Data %>% filter(!(grepl("001|008|009|010|011|012|016|017|018", rownames(.))))
+Sample_Data_Subset <- Sample_Data %>% filter(!(grepl("001|006|007|008|009|010|011|012|016|017|018", rownames(.))))
 
 # sampleAnnoFile from SegmentProperties sheet
 # countFile & featureAnnoFile from BioProbeCountMatrix sheet
@@ -345,7 +345,7 @@ next_sampleAnnoFile <- next_sampleAnnoFile %>%
 sampleAnnoFile <- next_sampleAnnoFile %>% 
   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
-sampleAnnoFile_Subset <- sampleAnnoFile %>% filter(!(grepl("001|008|009|010|011|012|016|017|018", sampleAnnoFile$ROILabel)))
+sampleAnnoFile_Subset <- sampleAnnoFile %>% filter(!(grepl("001|006|007|008|009|010|011|012|016|017|018", sampleAnnoFile$ROILabel)))
 #Optional: Remove Intermediate files from memory
 rm(next_sampleAnnoFile)
 rm(pre_sampleAnnoFile)
@@ -413,7 +413,7 @@ countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>%
   as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
 
 #Subset the columns to keep only the ROI of interest
-countFile_Subset <- countFile %>% dplyr::select(-matches("001|008|009|010|011|012|016|017|018"))
+countFile_Subset <- countFile %>% dplyr::select(-matches("001|006|007|008|009|010|011|012|016|017|018"))
 
 #Optional: remove intermediate datasets
 rm(pre_countFile, next_countFile, countFile_NegProbeWTX, countFile_others)
@@ -488,6 +488,10 @@ plotGeneQC(seo_qc)
 plotGeneQC(seo_qc, top_n=12, ordannots = "SlideName", col = SlideName, point_size = 2)
 plotGeneQC(seo_qc, top_n=12, ordannots = "Samples", col = Samples, point_size = 2)
 
+plotGeneQC(seo_qc_Subset)
+plotGeneQC(seo_qc_Subset, top_n=12, ordannots = "SlideName", col = SlideName, point_size = 2)
+plotGeneQC(seo_qc_Subset, top_n=12, ordannots = "Samples", col = Samples, point_size = 2)
+
 #Numeric Values: AOISurfaceArea, AOINucleiCount, 
 #RawReads, AlignedReads, DeduplicatedReads, TrimmedReads, StitchedReads, 
 #SequencingSaturation, lib_size, countOfLowEprGenes, percentOfLowEprGene
@@ -554,8 +558,8 @@ qc_keep_Subset <- colData(seo_qc_Subset)$AOINucleiCount > 300 &
   colData(seo_qc_Subset)$StitchedReads > 80 &
   colData(seo_qc_Subset)$SequencingSaturation > 50
 
-table(qc_keep) # No Values Below threshold
-# table(qc_keep_Subset) # No Values Below threshold
+# table(qc_keep) # No Values Below threshold
+table(qc_keep_Subset) # No Values Below threshold
 dim(seo_qc) # Dim 18676x24
 seo_qc_roi <- seo_qc[, qc_keep]
 seo_qc_roi_Subset <- seo_qc_Subset[, qc_keep_Subset] #No ROI Removed
@@ -656,7 +660,8 @@ seoPCA_Subset <-  scater::runPCA(seo_qc_roi_Subset)
 #runPCA adds reducedDimNames PCA
 pca_results_Subset <-  reducedDim(seoPCA_Subset, "PCA")
 drawPCA(seoPCA_Subset, precomputed = pca_results_Subset, col = Tumor)
-drawPCA(seoPCA_Subset, precomputed = pca_results_Subset, col = Samples)
+drawPCA(seoPCA_Subset, precomputed = pca_results_Subset, col = Samples) +
+  geom_label(aes(label = seoPCA_Subset$ROILabel), position = position_nudge(y=1))
 
 #Draw PCA Scree Plot
 plotScreePCA(seo_qc_roi, precomputed = pca_results)
@@ -755,8 +760,8 @@ Sample_Data <- as.data.frame(colData(seoUMAP_Normalized_Q3))
 #names(seoUMAP@metadata)
 NORMALIZATION_METHOD <- "TMM"
 seoUMAP_Normalized_TMM <- geomxNorm(seoUMAP, method = NORMALIZATION_METHOD, log = TRUE) #TMM Normalization
-#For Subset
-seoUMAP_Normalized_TMM_Subset <- geomxNorm(seoUMAP_Subset, method = NORMALIZATION_METHOD, log = TRUE) #TMM Normalization
+#For Subset (For Sub-subset since the sample size is less could not compile UMAP so used seoPCA_Subset data)
+seoUMAP_Normalized_TMM_Subset <- geomxNorm(seoPCA_Subset, method = NORMALIZATION_METHOD, log = TRUE) #TMM Normalization
 #geomxNorm Adds two more items to metadata: norm.factor, norm.method
 
 #names(seoUMAP_Normalized_TMM@metadata)
