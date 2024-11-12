@@ -1,5 +1,6 @@
 ## DEG Analysis Code Reformatting -Ongoing Original Working code still there 889 to 1367
 
+#Define Custom Genesets: immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique, naChannel_pathways_genes_unique
 genes_HIF1 <- c("LUCAT1", "HIF1A", "EPAS1", "ARRDC3", "NDRG1", "GLUT1", "PDK1", "PGK1", "VEGFA", "ARNT", "CREBBP", "EP300")
 #Alternative Names LUCAT1=SCAL1, EPAS1=HIF2A, CREBBP=CBP, EP300=P300
 genes_HIF1_synonyms <- c("SCAL1", "HIF2A", "CBP", "P300")
@@ -8,7 +9,10 @@ genes_DDR <- c("XRCC6", "XRCC2", "RAD54L", "PRKDC", "PTEN", "BRCA1", "BRCA2", "E
 #Alternative Names: XRCC6=Ku70, PRKDC=DNA PKcs, BLM=RECQL3
 genes_DDR_synonyms <- c("RECQL3")
 
-genes_HIF1_DDR <- c(genes_DDR, genes_DDR_synonyms, genes_HIF1, genes_HIF1_synonyms)
+genes_HIF1_DDR <- unique(c(genes_DDR, genes_DDR_synonyms, genes_HIF1, genes_HIF1_synonyms))
+
+hypoxia_genes <- c("HIF1A", "VEGFA", "PGK1", "LDHA", "ADM", "CA9", "EPO", "NDRG1", "BNIP3", "SLC2A1", "ENO1", "COL1A1", "TPI1", "ALDOA", "PGAM1", "HBEGF", "ANXA1", "P4HA1", "LOX", "PFN2")
+wnt_genes_mouse_test <- c("Fzd10","Wnt3","Wnt6","Wnt5b","Wnt9b","Wnt11","Rspo3","Dkk4", "Draxin", "Ngf","Snai2","Sox2","Sox17","Adamts5","Adam11")
 
 #Modifying the output dir to the Subset Directory
 output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/NanostringAnalysis/Nanostring-LUCAT1/output/Sub-SubsetAnalysis"
@@ -313,15 +317,13 @@ for (comp in 1:3) { #[INPUT_NEEDED]
     #Keep ~~~ OR ^^^ Segment
     ###^^^^^^^^^^^^^^^
     # Milan Set significance thresholds #[INPUT_NEEDED]
-    hypoxia_genes <- c("HIF1A", "VEGFA", "PGK1", "LDHA", "ADM", "CA9", "EPO", "NDRG1", "BNIP3", "SLC2A1", "ENO1", "COL1A1", "TPI1", "ALDOA", "PGAM1", "HBEGF", "ANXA1", "P4HA1", "LOX", "PFN2")
-    wnt_genes_mouse_test <- c("Fzd10","Wnt3","Wnt6","Wnt5b","Wnt9b","Wnt11","Rspo3","Dkk4", "Draxin", "Ngf","Snai2","Sox2","Sox17","Adamts5","Adam11")
     log2fc_threshold <- log2(2)  # 2-fold change
     pval_threshold <- 0.05 #-log10(0.05)
     
     # Milan Identify significant genes from the curated list
     PLOT_DATA[,"SIG_GENES"] <- NA
     PLOT_DATA[,"SIG_GENES"] <- ifelse(
-      PLOT_DATA[,"GENE"] %in% genes_HIF1_DDR, #& #[INPUT_NEEDED] immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique, naChannel_pathways_genes_unique
+      PLOT_DATA[,"GENE"] %in% genes_HIF1_DDR, #& #[INPUT_NEEDED] #Reference a predefined custom gene-set
         #abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
         #PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
       PLOT_DATA[,"GENE"],
