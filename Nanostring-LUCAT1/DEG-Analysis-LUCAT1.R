@@ -292,7 +292,7 @@ for (comp in 1:3) { #[INPUT_NEEDED]
     ################################
     
     
-    #Milan Dont transform before filtering; do this later
+    #Milan Don't transform before filtering; do this later
     
     # PLOT_DATA[,"PVAL"] <- -log10(PLOT_DATA[,"PVAL"])
     ################################################
@@ -353,6 +353,11 @@ for (comp in 1:3) { #[INPUT_NEEDED]
     x_limits <- c(NA, -2) #Volcanoplot label restricting at a location.
     TEST_SIG_GENES <- as.character(PLOT_DATA[complete.cases(PLOT_DATA[,"SIG_GENES"]),"SIG_GENES"])
     COMP_SIG_GENES <- c(COMP_SIG_GENES,unlist(TEST_SIG_GENES))
+    ###Section START- forZoomedPlotto further filter the plotted points to exclude outliers beyond defined x and y axes thresholds
+    PLOT_DATA <- PLOT_DATA %>%
+      filter(LOG2FC >= -4 & LOG2FC <= 4) %>%  # Limit x-axis range
+      filter(PVAL <= 10)  # Limit y-axis range (corresponds to p-value of 1e-10)
+    ###Section END- forZoomedPlot zooming in the center of volcano plot
     Volcano_Plot <- NULL
     Volcano_Plot <- ggplot(PLOT_DATA,aes(x = LOG2FC, y = PVAL,label=SIG_GENES, size = factor(THRESHOLD)))+
       #geom_label_repel(aes(label=SIG_GENES),box.padding= 0.3,point.padding = 0.5,segment.color="grey80",na.rm =T,colour = "black",fill="white",size = 3,force = 4,direction = "both",max.overlaps = Inf,nudge_x = 0,nudge_y = 0)+
@@ -360,20 +365,45 @@ for (comp in 1:3) { #[INPUT_NEEDED]
       geom_point(data=PLOT_DATA[!is.na(PLOT_DATA[,"SIG_GENES"]),],aes(size = factor(THRESHOLD)),alpha = 0.6,colour="black",shape=1,pch = 21,stroke = 1,show.legend = F)+
       
       # geom_label_repel(aes(label=SIG_GENES),box.padding= 0.3,point.padding = 0.5,segment.color="grey80",na.rm =T,colour = "black",fill="white",size = 1.5,force = 4,direction = "both",max.overlaps = Inf,nudge_x = 0,nudge_y = 0)+
-      geom_vline(xintercept = 0,color = "black", linetype='dashed',color = "#4268F4")+
-      geom_vline(xintercept = as.numeric(log(2,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+
-      geom_vline(xintercept = -as.numeric(log(2,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+
+      geom_vline(xintercept = 0,color = "black", linetype='dashed')+
+      geom_vline(xintercept = as.numeric(log(2,2)),color = "black", linetype='dashed',alpha = 0.5)+
+      geom_vline(xintercept = -as.numeric(log(2,2)),color = "black", linetype='dashed',alpha = 0.5)+
       # geom_vline(xintercept = as.numeric(log(3,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+ #log 3, base2
       # geom_vline(xintercept = -as.numeric(log(3,2)),color = "black", linetype='dashed',color = "#4268F4",alpha = 0.5)+ #log3, base2
-      geom_hline(yintercept = PVAL_th, linetype='dashed',color = "#4268F4")+
+      geom_hline(yintercept = PVAL_th, color = "#4268F4", linetype='dashed')+
       # geom_hline(yintercept = PVALADJ_th, linetype='dashed',color = "#007DEF")+
       geom_hline(yintercept = 0,color = "black")+
+      
+      #Text Legends-
       # geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP2_NAME,"_(N:",length(GROUP2_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#4268F4") +
       # geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP1_NAME,"_(N:",length(GROUP1_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#303030") +
       #[INPUT_NEEDED] for BFP, since the name is BBP replace appropriate group name GROUP2_NAME to "BFP"
-      geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP2_NAME,show.legend = F,size=20, color = "#4268F4", check_overlap = TRUE) +
-      geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP1_NAME,show.legend = F,size=20,color = "#4268F4", check_overlap = TRUE) +
       
+      #Text Legends
+      # geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP2_NAME,show.legend = F,size=20, color = "#4268F4", check_overlap = TRUE) +
+      # geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP1_NAME,show.legend = F,size=20,color = "#4268F4", check_overlap = TRUE) +
+      #Alternative text legends for zoomed in chart
+      geom_text(
+        x = -4 + 0.5,  # Position text towards left side
+        y = ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)) * 0.9,  # Position at 90% of max y-value
+        label = GROUP2_NAME,  # Simplified label
+        show.legend = F,
+        size = 15,
+        color = "#495057",
+        hjust = 0,  # Left-align text
+        check_overlap = TRUE
+      ) +
+      geom_text(
+        x = 4 - 0.5,  # Position text towards right side
+        y = ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)) * 0.9,  # Position at 90% of max y-value
+        label = GROUP1_NAME,  # Simplified label
+        show.legend = F,
+        size = 15,
+        color = "#495057",
+        hjust = 1,  # Right-align text
+        check_overlap = TRUE
+      ) +
+      #
       xlim(c(L2FC_MIN,L2FC_MAX))+
       scale_color_manual(values = c("grey50","#FF3158","#4268F4","#42B858"),breaks = c(0,1,2,3,4)) +
       # scale_color_manual(values = c("Highlighted" = "red", "Not Highlighted" = "grey")) +
@@ -412,11 +442,12 @@ for (comp in 1:3) { #[INPUT_NEEDED]
       xlab(paste("Log2 Fold Change",sep="")) +
       ylab(paste("-Log10(","P-Value)",sep="")) +
       ylim(c(0,(ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T))+1)))+
-      coord_cartesian(xlim = c(Min_Th,Max_Th),ylim = c(0,(ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T))+0.5)))+
+      # coord_cartesian(xlim = c(Min_Th,Max_Th),ylim = c(0,(ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T))+0.5)))+
+      coord_cartesian(xlim = c(-4, 4), ylim = c(0, 10))+  # forZoomedPlot Add or modify these values as needed
       theme_bw() + 
       theme(panel.border = element_blank(), panel.grid.major = element_blank(),
             panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))+
-      theme(plot.title = element_text(hjust = 0.5))+
+      # theme(plot.title = element_text(hjust = 0.5))+
       theme(text = element_text(face = "bold",size = 10),
             axis.text.x=element_text(angle=0, hjust=1, vjust=0,size=20), #From10
             axis.title = element_text(size=24,face="bold"), #From12
@@ -425,9 +456,35 @@ for (comp in 1:3) { #[INPUT_NEEDED]
             legend.text=element_text(size=12),
             legend.title=element_text(size=12),
             axis.line = element_line(size=2),
-            legend.position = "bottom")+
-      theme(plot.title = element_text(size=28))+ #From 8
+            legend.position = "bottom",
+            plot.title = element_text(hjust = 0.5, size=28))+
+      # theme(plot.title = element_text(size=28))+ #From 8
       guides(fill=guide_legend(nrow=2, byrow=TRUE))+
+      
+      
+      #Add x scales
+      scale_x_continuous(
+        breaks = seq(-4, 4, by = 1),  # Add ticks every 1 units from -4 to 4
+        # Or use this for different intervals:
+        # breaks = c(-4, -3, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 3, 4),
+        limits = c(-4, 4)
+      ) +
+      #Add y scales
+      # scale_y_continuous(
+      #   # breaks = seq(-4, 4, by = 0.5),  # Add ticks every 0.5 units from -4 to 4
+      #   # Or use this for different intervals:
+      #   breaks = c(0, 0.5, 2.5, 5, 7.5, 10)
+      # ) +
+      # Optionally rotate x-axis labels if they become crowded
+      theme(
+        axis.text.x = element_text(
+          # angle = 45,  # Rotate labels 45 degrees
+          hjust = 1,   # Align the labels
+          size = 20
+        )
+      )+
+      #
+      
       theme(legend.position = "none")
     
     #### Mean Plot
@@ -478,9 +535,10 @@ for (comp in 1:3) { #[INPUT_NEEDED]
         geom_hline(yintercept = log(2,2), linetype='dashed',color = "#4268F4")+
         geom_hline(yintercept = -log(2,2), linetype='dashed',color = "#4268F4")+
         geom_hline(yintercept = 0,color = "black")+
+        #Text Legends
         geom_text(y=L2FC_MIN+1, x=MEANEXP_MAX, label=gsub("_","\n",paste(GROUP2_NAME,"_(N:",length(GROUP2_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#4268F4") +
         geom_text(y=L2FC_MAX-1, x=MEANEXP_MAX, label=gsub("_","\n",paste(GROUP1_NAME,"_(N:",length(GROUP1_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#4268F4") +
-        # 
+        #
         scale_color_manual(values = c("grey50","#FF3158","#4268F4","#42B858"),breaks = c(0,1,2,3,4)) +
         scale_alpha_manual(values = c(0.5,1,1,1),breaks = c(0,1,2,3,4)) +
         scale_size_manual(values = c(0,1,2,3,4),breaks = c(0,1,2,3,4)) +
