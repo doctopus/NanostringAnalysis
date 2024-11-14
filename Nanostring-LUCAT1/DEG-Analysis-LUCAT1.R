@@ -15,7 +15,7 @@ hypoxia_genes <- c("HIF1A", "VEGFA", "PGK1", "LDHA", "ADM", "CA9", "EPO", "NDRG1
 wnt_genes_mouse_test <- c("Fzd10","Wnt3","Wnt6","Wnt5b","Wnt9b","Wnt11","Rspo3","Dkk4", "Draxin", "Ngf","Snai2","Sox2","Sox17","Adamts5","Adam11")
 
 #Modifying the output dir to the Subset Directory
-output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/NanostringAnalysis/Nanostring-LUCAT1/output/Sub-SubsetAnalysis"
+output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/NanostringAnalysis/Nanostring-LUCAT1/output/5thAnalysis"
 
 
 #### COMPARISON BETWEEN GROUPS [VOLCANO PLOT] (Subset and Main Analysis Merged using the same variables)----

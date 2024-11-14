@@ -322,7 +322,8 @@ Sample_Data<-read.csv(file = file_samplesheet,
                       row.names = "TargetName")
 #For-Subset of ROI Analysis
 #Removing 001, 008, 009 from KD, and 016, 017, 018 from Control
-Sample_Data_Subset <- Sample_Data %>% filter(!(grepl("001|006|007|008|009|010|011|012|016|017|018", rownames(.))))
+# Sample_Data_Subset <- Sample_Data %>% filter(!(grepl("001|006|007|008|009|010|011|012|016|017|018", rownames(.))))
+Sample_Data_Subset <- Sample_Data %>% filter(!(grepl("006|007|008|009|010|011|012", rownames(.))))
 
 # sampleAnnoFile from SegmentProperties sheet
 # countFile & featureAnnoFile from BioProbeCountMatrix sheet
@@ -345,7 +346,9 @@ next_sampleAnnoFile <- next_sampleAnnoFile %>%
 sampleAnnoFile <- next_sampleAnnoFile %>% 
   as.data.frame(., row.names=NULL, optional=FALSE, stringAsFactors = FALSE)
 
-sampleAnnoFile_Subset <- sampleAnnoFile %>% filter(!(grepl("001|006|007|008|009|010|011|012|016|017|018", sampleAnnoFile$ROILabel)))
+# sampleAnnoFile_Subset <- sampleAnnoFile %>% filter(!(grepl("001|006|007|008|009|010|011|012|016|017|018", sampleAnnoFile$ROILabel)))
+sampleAnnoFile_Subset <- sampleAnnoFile %>% filter(!(grepl("006|007|008|009|010|011|012", sampleAnnoFile$ROILabel)))
+
 #Optional: Remove Intermediate files from memory
 rm(next_sampleAnnoFile)
 rm(pre_sampleAnnoFile)
@@ -413,7 +416,7 @@ countFile <- bind_rows(countFile_NegProbeWTX, countFile_others) %>%
   as.data.frame(., row.names = NULL, optional = FALSE, stringsAsFactors = FALSE)
 
 #Subset the columns to keep only the ROI of interest
-countFile_Subset <- countFile %>% dplyr::select(-matches("001|006|007|008|009|010|011|012|016|017|018"))
+countFile_Subset <- countFile %>% dplyr::select(-matches("006|007|008|009|010|011|012"))
 
 #Optional: remove intermediate datasets
 rm(pre_countFile, next_countFile, countFile_NegProbeWTX, countFile_others)
@@ -501,10 +504,10 @@ plotGeneQC(seo_qc_Subset, top_n=12, ordannots = "Samples", col = Samples, point_
 
 #Final data of this segment: seo_qc OR seo_qc_Subset
 #### ROI level QC [seo_qc_roi]----
-names(seo_qc@colData)
-view(seo_qc@colData)
-sapply(seo_qc@colData, class)
-sapply(seo_qc@colData, is.numeric)
+# names(seo_qc@colData)
+# view(seo_qc@colData)
+# sapply(seo_qc@colData, class)
+# sapply(seo_qc@colData, is.numeric)
 
 plotROIQC(seo_qc)
 
@@ -652,14 +655,19 @@ set.seed(100)
 seoPCA <-  scater::runPCA(seo_qc_roi)
 #runPCA adds reducedDimNames PCA
 pca_results <-  reducedDim(seoPCA, "PCA")
-drawPCA(seoPCA, precomputed = pca_results, col = Tumor)
-drawPCA(seoPCA, precomputed = pca_results, col = Samples)
+drawPCA(seoPCA, precomputed = pca_results, col = Tumor) +
+  geom_label(aes(label = seoPCA$ROILabel), position = position_nudge(y=1))
+
+drawPCA(seoPCA, precomputed = pca_results, col = Samples) +
+  geom_label(aes(label = seoPCA$ROILabel), position = position_nudge(y=1))
 
 #For the subset
 seoPCA_Subset <-  scater::runPCA(seo_qc_roi_Subset)
 #runPCA adds reducedDimNames PCA
 pca_results_Subset <-  reducedDim(seoPCA_Subset, "PCA")
-drawPCA(seoPCA_Subset, precomputed = pca_results_Subset, col = Tumor)
+drawPCA(seoPCA_Subset, precomputed = pca_results_Subset, col = Tumor) +
+  geom_label(aes(label = seoPCA_Subset$ROILabel), position = position_nudge(y=1))
+
 drawPCA(seoPCA_Subset, precomputed = pca_results_Subset, col = Samples) +
   geom_label(aes(label = seoPCA_Subset$ROILabel), position = position_nudge(y=1))
 
@@ -761,7 +769,7 @@ Sample_Data <- as.data.frame(colData(seoUMAP_Normalized_Q3))
 NORMALIZATION_METHOD <- "TMM"
 seoUMAP_Normalized_TMM <- geomxNorm(seoUMAP, method = NORMALIZATION_METHOD, log = TRUE) #TMM Normalization
 #For Subset (For Sub-subset since the sample size is less could not compile UMAP so used seoPCA_Subset data)
-seoUMAP_Normalized_TMM_Subset <- geomxNorm(seoPCA_Subset, method = NORMALIZATION_METHOD, log = TRUE) #TMM Normalization
+seoUMAP_Normalized_TMM_Subset <- geomxNorm(seoUMAP_Subset, method = NORMALIZATION_METHOD, log = TRUE) #TMM Normalization
 #geomxNorm Adds two more items to metadata: norm.factor, norm.method
 
 #names(seoUMAP_Normalized_TMM@metadata)
