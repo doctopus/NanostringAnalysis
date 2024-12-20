@@ -15,7 +15,7 @@ hypoxia_genes <- c("HIF1A", "VEGFA", "PGK1", "LDHA", "ADM", "CA9", "EPO", "NDRG1
 wnt_genes_mouse_test <- c("Fzd10","Wnt3","Wnt6","Wnt5b","Wnt9b","Wnt11","Rspo3","Dkk4", "Draxin", "Ngf","Snai2","Sox2","Sox17","Adamts5","Adam11")
 
 #Modifying the output dir to the Subset Directory
-output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/NanostringAnalysis/Nanostring-LUCAT1/output/5thAnalysis"
+output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/NanostringAnalysis/Nanostring-LUCAT1/output/6thAnalysis"
 
 
 #### COMPARISON BETWEEN GROUPS [VOLCANO PLOT] (Subset and Main Analysis Merged using the same variables)----
@@ -53,7 +53,7 @@ COMPARE_TABLE <- as.data.frame(cbind(
   ))
 
 comp =1 #[INPUT_NEEDED]
-for (comp in 1:3) { #[INPUT_NEEDED]
+for (comp in 1:1) { #[INPUT_NEEDED]
   print (comp)
   COMPARE_GROUP_NAME = COMPARE_TABLE[comp,"COMPARE_GROUP_NAME"] 
   GROUP1_NAME = COMPARE_TABLE[comp,"GROUP1_NAME"] 
@@ -323,9 +323,10 @@ for (comp in 1:3) { #[INPUT_NEEDED]
     # Milan Identify significant genes from the curated list
     PLOT_DATA[,"SIG_GENES"] <- NA
     PLOT_DATA[,"SIG_GENES"] <- ifelse(
-      PLOT_DATA[,"GENE"] %in% genes_HIF1_DDR, #& #[INPUT_NEEDED] #Reference a predefined custom gene-set
+      PLOT_DATA[,"GENE"] %in% genes_HIF1_DDR & #[INPUT_NEEDED] #Reference a predefined custom gene-set
         #abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
-        #PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
+        PLOT_DATA[,"LOG2FC"] <= 0, #&
+        # PLOT_DATA[,"PVAL"] > pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
       PLOT_DATA[,"GENE"],
       NA
     )
