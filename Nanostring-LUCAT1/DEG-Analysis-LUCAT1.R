@@ -326,7 +326,7 @@ for (comp in 1:1) { #[INPUT_NEEDED]
       PLOT_DATA[,"GENE"] %in% genes_HIF1_DDR & #[INPUT_NEEDED] #Reference a predefined custom gene-set
         #abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
         PLOT_DATA[,"LOG2FC"] <= 0, #&
-        # PLOT_DATA[,"PVAL"] > pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
+        PLOT_DATA[,"PVAL"] > pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
       PLOT_DATA[,"GENE"],
       NA
     )
