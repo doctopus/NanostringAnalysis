@@ -1,5 +1,12 @@
 ## DEG Analysis Code Reformatting -Ongoing Original Working code still there 889 to 1367
 
+#Define Custom Genesets: ----
+# viz: immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique, naChannel_pathways_genes_unique
+wnt_genes_mouse_test <- c("Fzd10","Wnt3","Wnt6","Wnt5b","Wnt9b","Wnt11","Rspo3","Dkk4", "Draxin", "Ngf","Snai2","Sox2","Sox17","Adamts5","Adam11")
+
+#Optional: Modifying the output dir to the Subset Directory
+#output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/NanostringAnalysis/Nanostring-LUCAT1/output/Sub-SubsetAnalysis"
+
 #### COMPARISON BETWEEN GROUPS [VOLCANO PLOT]----
 # Inputs: Sample_Data, Counts_Data, Feature_Data, Normalized Counts Data
 #Sample_Data should have had the SlideName alrerady modified by now, and ROI Column added,
@@ -230,7 +237,7 @@ for (comp in 2:2) { #[INPUT_NEEDED]
   
   
   #### Nested Loop Will Start
-  DEG_TESTS <- c("EDGER")#,"LIMMA","TTEST")
+  DEG_TESTS <- c("EDGER")#,"LIMMA", "TTEST")
   Df_Positive_List <- NULL
   Df_Negative_List <- NULL
   test = 1
@@ -288,14 +295,13 @@ for (comp in 2:2) { #[INPUT_NEEDED]
     ###~~~~~~~~~~~~
     ###^^^^^^^^^^^^^^^
     # Milan Set significance thresholds #[INPUT_NEEDED]
-    wnt_genes_mouse_test <- c("Fzd10","Wnt3","Wnt6","Wnt5b","Wnt9b","Wnt11","Rspo3","Dkk4", "Draxin", "Ngf","Snai2","Sox2","Sox17","Adamts5","Adam11")
     log2fc_threshold <- log2(2)  # 2-fold change
     pval_threshold <- 0.05 #-log10(0.05)
     
     # Milan Identify significant genes from the curated list
     PLOT_DATA[,"SIG_GENES"] <- NA
     PLOT_DATA[,"SIG_GENES"] <- ifelse(
-      PLOT_DATA[,"GENE"] %in% naChannel_pathways_genes_unique & #[INPUT_NEEDED] immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique
+      PLOT_DATA[,"GENE"] %in% wnt_genes_mouse & #[INPUT_NEEDED] Defined at top/ retrieve from GSEA-Analysis.R: naChannel_pathways_genes_unique, immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique
         abs(PLOT_DATA[,"LOG2FC"]) >= log2fc_threshold &
         PLOT_DATA[,"PVAL"] < pval_threshold, # Note: '>' instead of '<' because of -log10 transformation
       PLOT_DATA[,"GENE"],
@@ -311,11 +317,11 @@ for (comp in 2:2) { #[INPUT_NEEDED]
     
     ## Optional: Limit number of labeled genes to prevent overcrowding (Top 100 significant genes) #[INPUT_NEEDED] or comment out below section
     ###^^^^^^^^^^^^^^^^^^^^^^^^^^
-    # sig_genes <- PLOT_DATA[!is.na(PLOT_DATA[,"SIG_GENES"]),]
-    # sig_genes <- sig_genes[order(sig_genes[,"PVAL"], decreasing = TRUE),]  # Note: decreasing = TRUE because of -log10 transformation
-    # top_n <- min(100, nrow(sig_genes))
-    # top_genes <- sig_genes[1:top_n, "GENE"]
-    # PLOT_DATA[,"SIG_GENES"] <- ifelse(PLOT_DATA[,"GENE"] %in% top_genes, PLOT_DATA[,"GENE"], NA)
+    sig_genes <- PLOT_DATA[!is.na(PLOT_DATA[,"SIG_GENES"]),]
+    sig_genes <- sig_genes[order(sig_genes[,"PVAL"], decreasing = TRUE),]  # Note: decreasing = TRUE because of -log10 transformation
+    top_n <- min(100, nrow(sig_genes))
+    top_genes <- sig_genes[1:top_n, "GENE"]
+    PLOT_DATA[,"SIG_GENES"] <- ifelse(PLOT_DATA[,"GENE"] %in% top_genes, PLOT_DATA[,"GENE"], NA)
     ###^^^^^^^^^^^^^^^^^^^^^^^^^^
     
     ###################################################
@@ -339,7 +345,7 @@ for (comp in 2:2) { #[INPUT_NEEDED]
       geom_hline(yintercept = 0,color = "black")+
       # geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP2_NAME,"_(N:",length(GROUP2_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#4268F4") +
       # geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=gsub("_","\n",paste(GROUP1_NAME,"_(N:",length(GROUP1_SAMPLES),")",sep="")),show.legend = F,size=5,color = "#303030") +
-      #[INPUT_NEEDED] for BFP, since the name is BBP replace appropriate group name GROUP2_NAME to "BFP"
+      #[INPUT_NEEDED] for BFP, since in comparoson group 2 the name is BBP replace appropriate group name GROUP2_NAME to "BFP"
       geom_text(x=L2FC_MIN+1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label="BFP",show.legend = F,size=20, color = "#4268F4", check_overlap = TRUE) +
       geom_text(x=L2FC_MAX-1, y=ceiling(max(PLOT_DATA[,"PVAL"],na.rm = T)), label=GROUP1_NAME,show.legend = F,size=20,color = "#4268F4", check_overlap = TRUE) +
       
@@ -375,7 +381,7 @@ for (comp in 2:2) { #[INPUT_NEEDED]
       scale_size_manual(values = c(0,1,2,3,4),breaks = c(0,1,2,3,4)) +
       #geom_text_repel(aes(x = G1_BE_VS_SQ_Like_Nuclei_DIFF, y = PVAL,label = SIG_GENES)) +
       # ggtitle(paste(DE_Analysis,"\n",TEST,"\nLog 2 FoldChange",sep = ""))+
-      ggtitle(paste("Sodium Channel Related Pathway Genes",sep = ""))+ #[INPUT_NEEDED]
+      ggtitle(paste("Wnt Pathway Genes -Top 100 Significant",sep = ""))+ #[INPUT_NEEDED]
       
       # xlab(paste(DE_Analysis,"\n Log2 Fold Change",sep="")) +
       xlab(paste("Log2 Fold Change",sep="")) +
