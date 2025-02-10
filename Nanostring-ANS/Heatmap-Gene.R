@@ -116,7 +116,7 @@ normalizedCountsData <- scaled_data
 sampleData <- Sample_Data #[INPUT_NEEDED]
 sampleData <- sampleData %>% mutate(SlideName = gsub("BBP", "BFP", SlideName))
 # Define the SlideName variables you want to keep
-selected_slides <- c("FP", "Sympa")#, "BFP", "IBTP", "SP")  # Replace with your desired slide names
+selected_slides <- c("BFP", "FP", "Sympa")#, "IBTP", "SP")  # Replace with your desired slide names
 
 # Subset sampleData and normalizedCountsData
 sample_data_subset <- sampleData[sampleData$SlideName %in% selected_slides, ]
