@@ -2,6 +2,7 @@
 library(ComplexHeatmap)
 library(circlize)
 library(grid)
+library(dplyr) #For %>% Operator
 
 create_heatmap <- function(count_scores, pathway, sample_data) {
   # Ensure sample_data is in the same order as count_scores columns
@@ -83,6 +84,9 @@ custom_genes <- c("Nlgn3", "Nlgn1", "Npy", "Nlgn2")
 custom_genes <- c("Mmp2", "Jun", "Adam17", "Adam10", "Nlgn2", "Mmp9", "Nlgn3", "Adrb2", "Adrb1", "Npy1r", "Nlgn1", "Npy", "Nrxn1", "Nrxn2", "Nrxn3", "Npy5r", "Slc18a3", "Npy2r", "Fos")
 
 custom_genes <- c("Fzd10","Wnt3","Wnt6","Wnt5b","Wnt9b","Wnt11","Rspo3","Dkk4", "Draxin", "Ngf","Snai2","Sox2","Sox17","Adamts5","Adam11")
+
+custom_genes <- c("Zeb1", "Tcf7", "Snail", "Myc", "Abc", "Ccnd1", "Cdh2", "Fak", "Akt", "Jnk", "Erk", "Mapk", "Stat3", "Axin2", "Rspo3",
+                  "Wnt11", "Wnt5b", "Wnt3", "Fzd10")
 #Diagnose duplicates
 # gene_names <- data.frame(rownames=rownames(Normalized_Counts_Data_TMM))
 
@@ -112,7 +116,7 @@ normalizedCountsData <- scaled_data
 sampleData <- Sample_Data #[INPUT_NEEDED]
 sampleData <- sampleData %>% mutate(SlideName = gsub("BBP", "BFP", SlideName))
 # Define the SlideName variables you want to keep
-selected_slides <- c("BFP", "FP", "Sympa")#, "IBTP", "SP")  # Replace with your desired slide names
+selected_slides <- c("FP", "Sympa")#, "BFP", "IBTP", "SP")  # Replace with your desired slide names
 
 # Subset sampleData and normalizedCountsData
 sample_data_subset <- sampleData[sampleData$SlideName %in% selected_slides, ]
