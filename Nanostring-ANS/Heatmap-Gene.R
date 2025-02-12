@@ -31,7 +31,7 @@ create_heatmap <- function(count_scores, pathway, sample_data) {
                 name = paste(pathway, "Scores"),
                 col = colorRamp2(breaks, colors), #Added for scaled_data; not needed otherwise
                 column_title = pathway,
-                cluster_rows = TRUE,
+                cluster_rows = FALSE,
                 cluster_columns = FALSE,
                 show_row_names = TRUE,
                 show_column_names = TRUE,
@@ -137,4 +137,4 @@ sample_data_subset <- sample_data_subset[common_samples, ]
 plot_and_save_heatmap(normalizedCountsData, 
                       sample_data_subset, 
                       "Wnt Pathway Gene Expression", 
-                      "Custom_Pathway_TMM.pdf")
+                      "20250210 Custom_Pathway_TMM.pdf")
