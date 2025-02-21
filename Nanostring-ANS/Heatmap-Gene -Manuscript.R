@@ -1,4 +1,9 @@
 ###Plot HandPicked Gene Heatmap from Normalized Counts -All legends in one column
+library(ComplexHeatmap)
+library(circlize)
+library(grid)
+library(dplyr) #For %>% Operator
+
 process_expression_data <- function(raw_counts, custom_genes, sample_data, selected_slides) {
   # Filter genes
   filtered_counts <- raw_counts[custom_genes,]
@@ -169,7 +174,7 @@ create_legends <- function(slide_colors, neuron_colors, count_scores, color_sche
 }
 
 draw_complete_heatmap <- function(heatmap_obj, legends, count_scores) {
-  total_height <- unit(min(15, max(10, nrow(count_scores) * 0.3)), "inch")
+  total_height <- unit(min(18, max(10, nrow(count_scores) * 0.3)), "inch")
   
   draw(heatmap_obj,
        heatmap_legend_side = "left",
@@ -209,5 +214,5 @@ save_heatmap(
   processed_data$counts,
   processed_data$metadata,
   "Wnt Pathway Gene Expression",
-  "20250211-27 Custom_Pathway_TMM.pdf"
+  "20250212-29 Custom_Pathway_TMM.pdf"
 )
