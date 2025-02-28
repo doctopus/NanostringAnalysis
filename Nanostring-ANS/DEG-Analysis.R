@@ -1,4 +1,4 @@
-## DEG Analysis Code Reformatting -Ongoing Original Working code still there 889 to 1367
+## DEG Analysis Code Reformatting -Ongoing Original Working code still there 889 to 1367 (Need to Remove)
 
 #Define Custom Genesets: ----
 # viz: immune_pathways_genes_unique_c2, wnt_genes_mouse_test or wnt_genes_mouse, immune_pathways_genes_unique, naChannel_pathways_genes_unique
@@ -6,6 +6,7 @@ wnt_genes_mouse_test <- c("Fzd10","Wnt3","Wnt6","Wnt5b","Wnt9b","Wnt11","Rspo3",
 
 #Optional: Modifying the output dir to the Subset Directory
 #output_dir <- "/Users/i/Dropbox/Clinic3.0/Developer/RStudio/NanostringAnalysis/Nanostring-LUCAT1/output/Sub-SubsetAnalysis"
+
 
 #### COMPARISON BETWEEN GROUPS [VOLCANO PLOT]----
 # Inputs: Sample_Data, Counts_Data, Feature_Data, Normalized Counts Data
